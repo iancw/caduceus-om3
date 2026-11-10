@@ -1,5 +1,9 @@
 // The look in the photo (docs/superpowers/specs/2026-11-10-look-in-photo-xmp-design.md): the reference formatter and the
 // reader. Field names, order and ranges come from docs/xmp-fields.json; exact text from docs/xmp-golden.json.
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import fields from '../../docs/xmp-fields.json';
 import golden from '../../docs/xmp-golden.json';
@@ -98,5 +102,25 @@ describe('lookFromPhoto', () => {
   });
   it('findXmp returns null when there is none', () => {
     expect(findXmp(jpeg(null))).toBeNull();
+  });
+});
+
+describe('exiftool config (docs/caduceus-xmp.config)', () => {
+  const CFG = join(__dirname, '../../docs/caduceus-xmp.config');
+  it('names every field of xmp-fields.json and the namespace', () => {
+    const cfg = readFileSync(CFG, 'utf8');
+    for (const f of fields.fields) expect(cfg, f.name).toMatch(new RegExp(`\\b${f.name}\\b`));
+    expect(cfg).toContain(fields.namespace);
+  });
+  const hasExiftool = (() => { try { execFileSync('exiftool', ['-ver']); return true; } catch { return false; } })();
+  it.skipIf(!hasExiftool)('reads the fields from a photo by name', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xmp-'));
+    const file = join(dir, 'p.jpg');
+    writeFileSync(file, jpeg(packet(golden.cases[0].text)));
+    const get = (tag: string) => execFileSync('exiftool', ['-config', CFG, `-XMP-cad:${tag}`, '-s3', file]).toString().trim();
+    expect(get('Film')).toBe('1');
+    expect(get('Look')).toBe('Portra 400');
+    expect(get('Hue')).toBe('0,0,0,1,0,0,0,0,0,0,0,0');
+    expect(get('HighlightStrength')).toBe('-1');
   });
 });
