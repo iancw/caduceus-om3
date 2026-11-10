@@ -19,6 +19,7 @@ import { namesBin } from './om3names';
 import { SPLIT_COLOURS, SPLIT_MAX, type Split } from './split';
 import { CAMERA_FILMS, FILMS, FILM_GROUPS, filmLook, filmOf, type Film, type FilmGroup } from './om3films';
 import { parseLook } from './pack';
+import { lookFromPhoto } from './xmp';
 // ---------------------------------------------------------------- state
 const LIBRARY = parsePack(libraryJson);
 // The colour-frames test photo first, then public-domain (CC0) photos picked for skin, strong colour, greens, blues,
@@ -213,6 +214,7 @@ function shell() {
         h('button', { onclick: openFile, title: 'The card\'s OM3MOD/LOOKS.BIN, or a looks file saved from this tool' }, 'Open…'),
         h('button', { onclick: () => om3FilmPicker(), title: 'Add film simulations to your films' }, 'Film sims'),
         h('button', { onclick: pasteDialog, title: 'Open a shared look or looks link' }, 'Paste link'),
+        h('button', { onclick: () => $<HTMLInputElement>('#lookphoto').click(), title: 'Read the look a photo from the patched camera was shot with and add it to your looks' }, 'Look from photo'),
         h('button', { onclick: om3Share }, 'Share looks'),
         h('button', { onclick: om3InstallDialog }, 'Install firmware'),
         h('button', { class: 'primary', onclick: om3ExportDialog }, 'Export'))),
@@ -225,7 +227,8 @@ function shell() {
       h('a', { href: './samples/CREDITS.md', target: '_blank', rel: 'noopener' }, 'Image credits')),
     h('div', { id: 'toast', class: 'toast', role: 'status', 'aria-live': 'polite' }),
     h('input', { type: 'file', id: 'file', accept: '.json,application/json,.bin,.BIN', hidden: true, onchange: om3OnFile }),
-    h('input', { type: 'file', id: 'photo', accept: 'image/*', hidden: true, onchange: onPhoto }));
+    h('input', { type: 'file', id: 'photo', accept: 'image/*', hidden: true, onchange: onPhoto }),
+    h('input', { type: 'file', id: 'lookphoto', accept: '.jpg,.jpeg,image/jpeg', hidden: true, onchange: om3OnLookPhoto }));
   buildPreview();
 }
 
@@ -1112,6 +1115,35 @@ async function om3OnFile(e: Event) {
   } catch (err) { toast(`Not an OM-3 LOOKS.BIN or looks file: ${(err as Error).message}`, 'err'); }
 }
 
+/** Put a look in the first free place from the selected one (asking before it replaces one); returns its place (`at`, "FILM n"), or '' when the user declines. */
+function om3PlaceLook(look: Look): string {
+  let k = O.k, v = O.v;
+  if (O.bank[k][v]) {
+    const free = O.bank[k].findIndex((x) => !x);
+    if (free >= 0) v = free;
+    else {
+      const any = O.bank.flat().findIndex((x) => !x);
+      if (any >= 0) { k = Math.floor(any / PER); v = any % PER; }
+      else if (!confirm(`All 20 looks are in use. Replace ${at(O.k, O.v)} ("${O.bank[k][v]!.name}") with "${look.name}"?`)) return '';
+    }
+  }
+  O.bank[k][v] = look; O.k = k; O.v = v;
+  save(); renderAll();
+  return at(k, v);
+}
+
+/** A JPG made by the patched camera: its look (docs/FORMATS.md "XMP fields") is added to the looks. Read in the browser only. */
+async function om3OnLookPhoto(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0];
+  (e.target as HTMLInputElement).value = '';
+  if (!f) return;
+  try {
+    const r = lookFromPhoto(new Uint8Array(await f.arrayBuffer()));
+    const where = om3PlaceLook(r.look);
+    if (where) toast(`Read "${r.look.name}" from ${f.name} and added it as ${where}`);
+  } catch (err) { toast((err as Error).message, 'err'); }
+}
+
 async function om3ImportCode(t: string, fromLink: boolean): Promise<boolean> {
   try {
     if (isOm3Code(t, OB_PREFIX)) {
@@ -1124,19 +1156,9 @@ async function om3ImportCode(t: string, fromLink: boolean): Promise<boolean> {
     if (!isOm3Code(t, OP_PREFIX)) throw new Error('This is not an OM-3 look link (it starts with op1_ or ob1_).');
     const c: { look: Look | null; changed: string[]; dropped: string[] } = { look: parseLook(await decodeOm3(OP_PREFIX, t), 'look'), changed: [], dropped: [] };
     if (!c.look) throw new Error('That link holds no look.');
-    let k = O.k, v = O.v;
-    if (O.bank[k][v]) {
-      const free = O.bank[k].findIndex((x) => !x);
-      if (free >= 0) v = free;
-      else {
-        const any = O.bank.flat().findIndex((x) => !x);
-        if (any >= 0) { k = Math.floor(any / PER); v = any % PER; }
-        else if (!confirm(`All 20 looks are in use. Replace ${at(O.k, O.v)} ("${O.bank[k][v]!.name}") with "${c.look.name}"?`)) return false;
-      }
-    }
-    O.bank[k][v] = c.look; O.k = k; O.v = v;
-    save(); renderAll();
-    toast(`Added "${c.look.name}" as ${at(k, v)}${om3Changes(c)}${minFw(c.look) > 20 ? ` · needs Caduceus v${FW_NAME[minFw(c.look)]} or later` : ''}`);
+    const where = om3PlaceLook(c.look);
+    if (!where) return false;
+    toast(`Added "${c.look.name}" as ${where}${om3Changes(c)}${minFw(c.look) > 20 ? ` · needs Caduceus v${FW_NAME[minFw(c.look)]} or later` : ''}`);
     return true;
   } catch (e) {
     importCodeMsg((e as Error).message);
