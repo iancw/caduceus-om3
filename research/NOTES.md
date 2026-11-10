@@ -2616,7 +2616,8 @@ Design: `docs/superpowers/specs/2026-11-10-look-in-photo-xmp-design.md`; fields:
   the capture), what exiftool, Lightroom etc. do with the fields, and whether the ORF (tag 700) carries the same packet.
 - **Camera test (owner):** shoot a film, COLOR's own settings and a non-COLOR mode (JPEG), plus one RAW+JPEG; send the JPGs (and the ORF); read with
   `exiftool -config docs/caduceus-xmp.config -XMP-cad:all`. Package: `E1479999.BIN` (in `DCOLYMP/`) + its paired `GUIDES.BIN` (in `OM3MOD/`):
-  build `xmp4` = rebuilt identically from the committed tree (E1479999.BIN 99f01d1a..., GUIDES.BIN 8cd6049e...).
+  build `xmp4` (E1479999.BIN 99f01d1a..., GUIDES.BIN 8cd6049e...) was the first test build; **superseded by the review-fix build `xmp7`**, rebuilt identically
+  from the committed tree: E1479999.BIN 97bff047..., GUIDES.BIN 13e4a782... (use this one).
 
 #### Review of the look-in-photo branch and its fixes (2026-11-10; emulator only, camera test pending)
 A fresh reviewer read the whole branch. Fixed, each with a test that failed first:
