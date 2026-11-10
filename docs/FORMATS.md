@@ -57,6 +57,35 @@ record when the changes were saved, so a film rebuilt in the Control Panel start
 COLOR 1–4's own settings (check 0). A file that fails the size, magic or CRC check is ignored. Deleting it puts every
 film back as built.
 
+## XMP fields (v1, work in progress: branch `feature/look-in-photo-xmp`, nothing camera-tested)
+
+The look a photo was shot with, written into the photo's XMP packet as `cad:` attributes. The single source of truth is
+`docs/xmp-fields.json` (names, order, record offsets, ranges); `docs/xmp-golden.json` holds exact expected text.
+The firmware table, the Control Panel (`webapp/src/xmp.ts`) and the exiftool config are all checked against them.
+
+Placement: the camera's packet is 2301 bytes (`xmp:Rating` only, then blank padding). The text goes **after the
+`xmp:Rating` digit's closing quote and before `/>`**; the packet length and the closing `<?xpacket end="w"?>` do not
+change. Text = ` xmlns:cad="https://androidfanman.github.io/caduceus-om3/ns/1/"` then ` cad:Name="value"` for each field in
+order (one space before each).
+
+| Field | Record | Value |
+|---|---|---|
+| `Version` | | `1` |
+| `Look` | name | look or film name from `LOOKS.BIN` (up to 15 characters; `& < > " '` and anything outside 0x20..0x7e become `_`); omitted when no film is selected |
+| `Film` | | 5 × (COLOR − 1) + look (1..20), `0` when the COLOR used its own settings |
+| `Hue`, `Light`, `Saturation` | +0, +12, +24 | 12 comma-separated numbers (−5..5), no spaces |
+| `WbOn`, `WbAB`, `WbGM` | +36..38 | 0/1, −7..7, −7..7 |
+| `Blacks`, `Whites` | +39, +40 | −5..5 |
+| `Contrast`, `Shading` | +41, +43 | −2..2, −5..5 |
+| `Shadows`, `Midtones`, `Highlights` | +44..46 | −7..7 |
+| `GlowClarity` | +47 | −5..−1 Glow, 1..5 Clarity, 0 off |
+| `Art`, `NR`, `VigFix`, `Grain`, `Sharp` | +48..52 | as the record: Art 0..5, NR 0..3, VigFix 0..1, Grain 0..3, Sharp −5..2 |
+| `ShadowColor`, `ShadowStrength`, `HighlightColor`, `HighlightStrength` | +53..56 | colour 0..11, strength −5..5 |
+
+Colour order of the three lists (the record's, clockwise from Yellow): Yellow, Orange, Orange-red, Red, Magenta, Violet,
+Blue, Blue-cyan, Cyan, Green-cyan, Green, Yellow-green. Record `+42` (legacy Sharpness) is not written. The values are
+the settings as applied at the shot (a film edited on the camera shows the edited values).
+
 ## BUNDLES.BIN (544 bytes)
 
 Caduceus BUNDLES.BIN v1 layout with OM-3 identity: `OM3B` | u16 version 1 | u16 header 32 | u32 firmware build 1100 |

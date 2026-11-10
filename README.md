@@ -1,5 +1,7 @@
 <h1 align="center">Caduceus for OM-3</h1>
 
+> **Branch `feature/look-in-photo-xmp`: work in progress, not for use.** Writing the applied look into each JPG's XMP (design: `docs/superpowers/specs/2026-11-10-look-in-photo-xmp-design.md`). Nothing here is camera-tested.
+
 <p align="center"><strong>Film looks and a colour editor, built into the OM SYSTEM OM-3.</strong></p>
 
 <p align="center">
