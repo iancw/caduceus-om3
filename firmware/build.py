@@ -63,6 +63,7 @@ HOOKS = {'.hook_color': (0x60518615, bytes.fromhex('cd6cfdf060')),
          '.hook_sc': (0x610cdf05, bytes.fromhex('f1e3f1d38001')),
          '.hook_pu': (0x611d04ec, bytes.fromhex('fca460a33760')),
          '.hook_pme': (0x6125becc, bytes.fromhex('cfb0f8fec4')),
+         '.hook_dial': (0x6109354d, bytes.fromhex('fcca' 'ffff0000')),   # dial probe: the dial position's setting id is compared with 65535 (function 0x610934ac)
          '.hook_rsp': (0x611c3cb5, bytes.fromhex('5c14f8bc20f87058')),
          '.hook_su': (0x604b7730, bytes.fromhex('cdab20f088')),
          '.hook_sel2': (0x60504b5d, bytes.fromhex('dddc830200a00c')),

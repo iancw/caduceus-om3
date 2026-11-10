@@ -8,6 +8,7 @@ SECTIONS {
   .hook_set     0x60b8798b : { *(.hook_set) }
   .hook_pmod    0x6129ba07 : { *(.hook_pmod) }
   .hook_rsp     0x611c3cb5 : { *(.hook_rsp) }
+  .hook_dial    0x6109354d : { *(.hook_dial) }
   .hook_su      0x604b7730 : { *(.hook_su) }
   .hook_sel2    0x60504b5d : { *(.hook_sel2) }
   .hook_c1e     0x605053cc : { *(.hook_c1e) }
@@ -65,6 +66,7 @@ nf_get        = 0x60063380;
 pg_back       = 0x611d07bd;
 pgm_back      = 0x611c3710;
 rsp_back      = 0x611c3cbd;
+dial_back     = 0x61093553;         /* dial probe: after the stock `cmp 65535,d2` (next: beq 0x61093583) */
 sf_stock      = 0x604be2aa;
 wl_back       = 0x604b8d99;         /* ft8: after the work-list key read */
 su_stock      = 0x604b97db;

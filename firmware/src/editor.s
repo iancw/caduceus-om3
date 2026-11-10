@@ -8603,3 +8603,56 @@ fl_stw:
  call stw_set,[],4
  jmp stw_back
 
+/* ---- Creative Dial -> film (experiment/dial-probe) ----
+ * Function 0x610934ac turns the dial's state into a setting id in d2 (900 Color Creator, 899 ART, 898 plain, 901 COLOR 1-4,
+ * 988 MONO 1-4, else 65535), then SetValue(897, d2) (research/NOTES.md "Creative Dial: the handler found"). .hook_dial is its
+ * `cmp 65535,d2` (6 bytes) -> jmp dial_hk, which ends with the same cmp and continues at dial_back (beq 0x61093583).
+ * dm_tab = {setting id, film value FV0 + j or 0 = the camera's own} for the four positions that are not COLOR. A position
+ * with a film: SetValue(901, film) (fl_set loads the film) and d2 = 901, so the stock code treats the position as COLOR.
+ * Not done (ext11 is full: 116 B were free): giving the COLOR position its own earlier pick back. Registers: d3, a2, a3 are
+ * the function's own and kept; d2 may change. All DM_* default to 0: the hook does nothing until a film is given. */
+.set DM_MONO, 0
+.set DM_NON, 0
+.set DM_ART, 0
+.set DM_CC, 0
+.section .hook_dial,"ax"
+ jmp dial_hk
+ .byte 0xcb
+.section .ext11,"ax"
+.balign 4
+dm_tab:
+ .short 988, DM_MONO
+ .short 898, DM_NON
+ .short 899, DM_ART
+ .short 900, DM_CC
+dial_hk:
+ mov dm_tab,a0
+ mov 4,d1
+1:
+ movhu (a0),d0
+ cmp d2,d0
+ beq 2f
+ add 4,a0
+ add -1,d1
+ bne 1b
+ bra 9f
+2:
+ movhu (2,a0),d0
+ cmp 0,d0
+ beq 9f
+ mov 901,d2
+ add -16,sp                       /* (0) call slot, (4) a2, (8) film */
+ mov a2,(4,sp)
+ mov d0,(8,sp)
+ call facade,[],4                 /* SetValue(901, film) */
+ mov (a0),a2
+ mov (4,a2),a2
+ mov (8,sp),a1
+ clr d1
+ mov 901,d0
+ calls (a2)
+ mov (4,sp),a2
+ add 16,sp
+9:
+ cmp 65535,d2
+ jmp dial_back

@@ -2331,3 +2331,21 @@ Question (owner): can the dial's positions each pick a COLOR / FILM look (e.g. A
   step stays on the same COLOR (noted for the SCP dials) may show here too; (3) the capture path may check the dial
   state for ART / MONO rendering; (4) MONO (988) and ART use other pipelines: a film on them is only as good as the
   COLOR route allows; (5) camera behaviour with a physical dial is unknown (emulator flips bits, no detent timing).
+
+### Creative Dial -> film: hook built and tested in the emulator (2026-11-10; branch experiment/dial-probe; EMULATOR ONLY)
+- Built (`firmware/src/editor.s` end, `.hook_dial` at 0x6109354d in editor.ld / build.py, `dial_back` 0x61093553): `dm_tab` =
+  4 x {setting id 988 / 898 / 899 / 900, film value FV0 + j or 0}; a position with a film -> SetValue(901, film) through the
+  facade (fl_set loads it, as the film list does) and d2 = 901, so the stock code then treats the position as COLOR. All
+  DM_* default to 0 (hook inert). ext11 is full: the first version (with giving the COLOR position its own pick back) was
+  65600 B of 65536; this one is 65520 (16 B free). Not done: that restore.
+- **Emulator (X; stock-based build out-dial1, card with this build's GUIDES / LABELS + v0.26.2 LOOKS / TONES; table
+  poked at run time MONO = FILM 3, ART = FILM 1, Color Creator = FILM 8, plain = none):** turning to ART gives COLOR 1
+  look 1 (P+LIDX 1,0,0,0) and the picture-mode screen opens on the COLOR / film editor with FILM 1 "Portra 400"
+  highlighted; MONO gives COLOR 1 look 3; Color Creator COLOR 2 look 3 = FILM 8 "Pro 400H" (screen likewise); the plain
+  position with no film does nothing (stock). Stock 897 handling unchanged (SetValue(897, 901) when it differs).
+  Test script `research/emulator/dial_film_test.mjs`. Needs the harness pokes 0xa32de590 / 0xa32de58c / 0x60369308 so the
+  films load (as session_autoload.mjs).
+- Known gaps: the COLOR position keeps the last film a mapped position set (no restore, no space); no photo was taken
+  (does a capture on a remapped ART position use the film? not run); the mapping table is poked, not read from a card
+  file; on a camera the table must live in a P-block / card file (the image is read-only flash); the dial's real
+  detents / timing are untested. Nothing here has been on a camera.
