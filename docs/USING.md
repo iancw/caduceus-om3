@@ -98,6 +98,17 @@ on the camera. Deleting `OM3MOD/EDITS.BIN` puts every film back as built.
 
 More on the Control Panel: [how to use it](CONTROL_PANEL.md).
 
+## Reading the look from a photo (work in progress, not in a release yet)
+
+A test build writes the settings a JPG was shot with into the photo's XMP (`cad:` fields: film name, the three colour
+wheels as 12-number lists, tone, white balance, Glow / Clarity, Art, NR, VigFix, Grain, Sharp, split toning; the
+list is in `docs/FORMATS.md`, "XMP fields"). The Control Panel's **Look from photo** button adds that look to your
+looks. To see the fields in exiftool by name:
+
+```
+exiftool -config docs/caduceus-xmp.config -XMP-cad:all photo.jpg
+```
+
 ## Questions
 
 See the [questions and answers](FAQ.md): no films in the list, settings that don't show in the photo, freezes, lost changes, video and more.
