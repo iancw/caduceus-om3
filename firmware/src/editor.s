@@ -7692,6 +7692,34 @@ s_wl:
 9:
  jmp wl_back
 
+/* The look in the photo (docs/superpowers/specs/2026-11-10-look-in-photo-xmp-design.md): the JPEG's XMP writer 0x60455cfa
+ * (called once per JPEG as `call 0x60455cfa,[d2],8`, a1 = where the APP1 segment goes) starts with `mov 255,d0; movbu d0,(a1)`.
+ * Those two instructions are replaced by a jump here: code block +152 (xb_xmp) gets the packet buffer 0x62a982e6 (the
+ * writer copies it, 2301 bytes, a few instructions later) and may rewrite it with the look; then the two instructions run
+ * and the writer goes on at 0x60455cff. a0, a1, d1 are kept (xb_xmp keeps d2, d3, a2, a3). No block: the stock writer. */
+.section .hook_xmp,"ax"
+ jmp s_xmp                        /* stock 0x60455cfa: 2c ff 00 f0 51 */
+
+.section .ext11,"ax"
+s_xmp:
+ add -16,sp
+ mov a0,(4,sp)
+ mov a1,(8,sp)
+ mov d1,(12,sp)
+ call xp,[],0
+ beq 9f
+ add 152,a1
+ mov 0x62a982e6,a0
+ calls (a1)
+9:
+ mov (4,sp),a0
+ mov (8,sp),a1
+ mov (12,sp),d1
+ add 16,sp
+ mov 255,d0
+ movbu d0,(a1)
+ jmp xmp_back
+
 /* ------------------------------------------------------------------ split toning (v0.26)
  * research/NOTES.md "Split toning": the RGB gamma stage (0x60516ad9) copies the picture-mode curve into the job three
  * times (O+1252 R / +1892 G / +2532 B: 256 x u16 12-bit + 64 x u16 fine table, 640 B each) before the stage list that

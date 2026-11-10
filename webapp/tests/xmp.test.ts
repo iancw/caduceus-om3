@@ -124,3 +124,18 @@ describe('exiftool config (docs/caduceus-xmp.config)', () => {
     expect(get('HighlightStrength')).toBe('-1');
   });
 });
+
+describe.skipIf(!process.env.XMP_EMU_JSON)('the firmware\'s packet (tools/emulator/xmp_fmt_check.sh, XMP_EMU_JSON = its xmp.json)', () => {
+  const emu = () => JSON.parse(readFileSync(process.env.XMP_EMU_JSON!, 'utf8')).scen;
+  it('is read back by readCad: FILM 3, the card\'s name, a neutral record', () => {
+    const r = readCad(emu().packet_a);
+    expect(r.film).toBe(3);
+    expect(r.name).toBe('Portra 400');
+    expect(Buffer.from(r.rec.subarray(0, 57)).toString('hex')).toMatch(/^(00)+$|^[0-9a-f]+$/);   // every byte in range is checked by readCad itself
+  });
+  it('loads as a look through a JPEG made around it', () => {
+    const r = lookFromPhoto(jpeg(Buffer.from(emu().packet_a, 'latin1')));
+    expect(r.film).toBe(3);
+    expect(r.look.name).toBe('Portra 400');
+  });
+});
