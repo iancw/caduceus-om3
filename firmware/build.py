@@ -113,7 +113,8 @@ EXT1 = (0x6031e920, 0x6031eff0)          # section-1 tail (FF from 0x6031e910, e
 EXT4 = (0x60a8f100, 0x60a8f7f0)
 EXT10 = (0x61aa4300, 0x61aa47f0)
 EXT8 = (0x617e45f0, 0x617e47f0)            # section-8 tail (FF from 0x617e45e0, end 0x617e4800)
-EXT11 = (0x60f49800, 0x60f59800)           # v0.23: section 6 extended by 64 KiB (loader end word 0x60045e9c raised; camera-proven GX2)
+GAP_KIB = int(__import__('os').environ.get('OM3_GAP_KIB', '64'))   # experiment/dial-probe: >64 = EMULATOR ONLY (not camera-proven; the emulator maps the whole gap)
+EXT11 = (0x60f49800, 0x60f49800 + GAP_KIB * 1024)           # v0.23: section 6 extended by 64 KiB (loader end word 0x60045e9c raised; camera-proven GX2)
 EXT3 = (0x6081fe10, 0x6081fffc)            # section-3 tail (FF from 0x6081fe00, end 0x60820000)
 EXT5 = (0x60adb5b0, 0x60adb7f0)            # section-5 tail (FF from 0x60adb5a0, end 0x60adb800)
 EXT6 = (0x60f49590, 0x60f497f0)            # section-6 tail (FF from 0x60f49580, end 0x60f49800)          # section-10 tail (FF from 0x61aa42f0, end 0x61aa4800)          # section-4 tail (FF from 0x60a8f088, end 0x60a8f800)
@@ -239,7 +240,7 @@ def build(defaults, testfile, out):
     for a, (stock, name) in WORDS.items():
         assert struct.unpack_from('<I', m, o(a))[0] == stock, hex(a)
         assert bytes(m).count(struct.pack('<I', stock)) == sum(1 for v in WORDS.values() if v[0] == stock), hex(stock)
-    for (lo_, hi_), s, ff_from, end in ((EXT1, '.ext1', 0x6031e910, 0x6031f000), (EXT4, '.ext4', 0x60a8f088, 0x60a8f800), (EXT10, '.ext10', 0x61aa42f0, 0x61aa4800), (EXT6, '.ext6', 0x60f49580, 0x60f49800), (EXT5, '.ext5', 0x60adb5a0, 0x60adb800), (EXT3, '.ext3', 0x6081fe00, 0x60820000), (EXT8, '.ext8', 0x617e45e0, 0x617e4800), (EXT9, '.ext9', 0x619a966c, 0x619a9800), (EXT2, '.ext2', 0x607187a4, 0x60718800), (EXT7, '.ext7', 0x6164afcc, 0x6164b000), (EXT11, '.ext11', 0x60f49580, 0x60f59800)):
+    for (lo_, hi_), s, ff_from, end in ((EXT1, '.ext1', 0x6031e910, 0x6031f000), (EXT4, '.ext4', 0x60a8f088, 0x60a8f800), (EXT10, '.ext10', 0x61aa42f0, 0x61aa4800), (EXT6, '.ext6', 0x60f49580, 0x60f49800), (EXT5, '.ext5', 0x60adb5a0, 0x60adb800), (EXT3, '.ext3', 0x6081fe00, 0x60820000), (EXT8, '.ext8', 0x617e45e0, 0x617e4800), (EXT9, '.ext9', 0x619a966c, 0x619a9800), (EXT2, '.ext2', 0x607187a4, 0x60718800), (EXT7, '.ext7', 0x6164afcc, 0x6164b000), (EXT11, '.ext11', 0x60f49580, EXT11[1])):
         print('SIZE', s, len(blobs[s]), hi_ - lo_, file=sys.stderr)
         assert lo_ + len(blobs[s]) <= hi_, (s, len(blobs[s]))
         assert set(m[o(ff_from):o(end)]) == {0xff} and m[o(ff_from) - 1] != 0xff, s
@@ -458,7 +459,9 @@ def build(defaults, testfile, out):
     (out / 'main.bin').write_bytes(bytes(m)); (out / 'E1479999.BIN').write_bytes(pkg)
     nm = subprocess.run([P.TC / 'binutils/nm-new', out / 'p.elf'], capture_output=True, text=True).stdout
     syms = {l.split()[2]: int(l.split()[0], 16) for l in nm.splitlines() if len(l.split()) == 3}
-    rep = dict(package_sha256=hashlib.sha256(pkg).hexdigest(), main_sha256=hashlib.sha256(bytes(m)).hexdigest(),
+    if GAP_KIB > 64:
+        print('WARNING: OM3_GAP_KIB=%d: section 6 extended past the camera-proven 64 KiB. EMULATOR ONLY: do not flash.' % GAP_KIB, file=sys.stderr)
+    rep = dict(emulator_only=GAP_KIB > 64, gap_kib=GAP_KIB, package_sha256=hashlib.sha256(pkg).hexdigest(), main_sha256=hashlib.sha256(bytes(m)).hexdigest(),
                main_bytes_changed=sum(x != y for x, y in zip(m, mc['dec'])),
                ext1=dict(addr=hex(EXT1[0]), bytes=len(blobs['.ext1'])), ext4=dict(addr=hex(EXT4[0]), bytes=len(blobs['.ext4'])), ext10=dict(addr=hex(EXT10[0]), bytes=len(blobs['.ext10'])), ext6=dict(addr=hex(EXT6[0]), bytes=len(blobs['.ext6'])), ext5=dict(addr=hex(EXT5[0]), bytes=len(blobs['.ext5'])), ext3=dict(addr=hex(EXT3[0]), bytes=len(blobs['.ext3'])), ext8=dict(addr=hex(EXT8[0]), bytes=len(blobs['.ext8'])), ext9=dict(addr=hex(EXT9[0]), bytes=len(blobs['.ext9'])),
                bundles_bin_sha256=hashlib.sha256(test).hexdigest(), defaults_sha256=hashlib.sha256(dflt).hexdigest(),
