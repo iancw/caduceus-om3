@@ -2440,3 +2440,154 @@ Fork: github.com/fernandezk26/camera-stuff (Apache-2.0), branches `sdload/v0.26.
   112 MB), menus, half-presses. **So 0x60f59800..0x60f99800 is proven code space** (a build must raise the loader's
   end word 0x60045e9c to 0x60f99800). The unloaded rest of section 6's gap (to 0x6103f000) was not written by
   anything during the test either. Owner's camera put back to v0.26.2 (card checked: 4add99d3… / 92b67919…).
+
+## Writing the look into the picture's metadata (idea, 2026-11-09; analysis only, nothing built or tried)
+
+Question (owner): where in the EXIF should a look's settings go, and how should they be named?
+- **Plan:** not the OM maker note (tag 0x927C: OM owns the tag numbers, its offsets are relative to the block, editors
+  rewrite or drop it). Two own-namespace routes instead: (1) a text field (UserComment) holding the `op1_...` look
+  code (cheap; round-trips with the Control Panel's paste box); (2) XMP with a `caduceus:` namespace (named fields;
+  exiftool reads any namespace, a small config file gives it names). Owner: "do both" (text first, XMP after).
+- **Known from our source:** the capture and Exif code paths read picture settings through the same property getters
+  we hook (`xb_nr` in `xblock.s`: key 0x9719 "capture and Exif sites", key 0x8119 Sharpness), so what the camera
+  records for NR / Sharp is already the patched value. Not yet seen: the Exif builder itself.
+- **Unknown:** what the OM-3 already writes for its profiles (exiftool -a -G1 -u -U on a shot made with one of our
+  films); whether the firmware can write extra UserComment / XMP bytes and where its EXIF buffer is; whether the
+  camera overwrites UserComment. Needs: one test photo from the owner (not committed) and the firmware workspace
+  (`research/setup.sh PATH`; now set up in the Linux container, see below).
+- **Stock sample read (2026-11-09; one OM-3 firmware 1.1 ORF shot with default settings, kept outside the repo; exiftool
+  13.55; camera-made data, analysis only):**
+  - The maker note is `OM SYSTEM\0II` (exiftool "MakerNoteOlympus3") with sub-IFDs (26 / 95 / 14 entries).
+  - **The camera already records most of what a look holds**, in the Olympus tag numbers: ToneLevel 0x052e
+    (Highlights / Shadows / Midtones, each value, min -7, max 7, with ids 0x8301..03), ColorProfileSettings 0x0539
+    (min -5, max 5, then 12 colours Yellow..Yellow-green: the OM-3 wheel; which axis - hue / light / sat - one default
+    shot cannot say), ColorCreatorEffect 0x0532, FilmGrainEffect 0x0538, MonochromeProfileSettings 0x0537,
+    MonochromeVignetting 0x053a, ModifiedSaturation 0x0504, PictureMode 0x0520, NoiseFilter 0x0527,
+    ShadingCompensation2 0x1012, ContrastSetting / SharpnessSetting (-5..5), ArtFilterEffect 0x052f. So exiftool
+    already names these; new maker-note tags are NOT needed for them (and would only risk clashing).
+  - Odd: ToneLevel read Highlights 6 / Shadows -6 on a default Natural shot (not understood).
+  - Not seen anywhere: split toning, the Glow / Clarity strength, A-B / G-M white-balance shift as profile values,
+    a film name.
+  - **ExifIFD UserComment (0x9286) is a 125-byte blank field** (8-byte charset id of zeros + 117 spaces): too small for
+    an `op1_` code (Portra 400 = 419 characters).
+  - **The camera already writes an XMP packet** (2301 bytes: only `xmp:Rating`, the rest is whitespace padding, about
+    2 KB free). So the "XMP, own namespace" route may be the easier one on the camera side too: fill the padding.
+  - Open: whether the patched firmware's capture-time values reach these tags (the getters we hook say yes for NR /
+    Sharp); a shot with non-default values to learn the ColorProfileSettings axis; the Exif builder's code.
+- **Exif strings in the stock decoded main block (file offset + 0x50000000; analysis):** the XMP template
+  (`<?xpacket begin` at 0x5060d3d1, `xmp:Rating` at 0x5060d00b and 0x5060d3fb) and the maker-note header
+  (`OM SYSTEM\0` at 0x5060cd74) sit together in one data area, so the Exif / XMP writer is a small fixed template that
+  can be found by its references. Not yet followed to the code.
+- **Linux container on the Mac (2026-11-10):** Colima (Docker, Apple Silicon) with `ubuntu:24.04`, container
+  `om3-linux`, the repo mounted at `/repo`, a Docker volume `om3-work` as `/root/om3-work` (the firmware is copied in
+  with `docker cp`, never into the repo). Packages: build-essential nodejs git xz-utils curl mtools python3
+  python3-pil python3-numpy python3-scipy fonts-dejavu-core fonts-dejavu-extra. `research/setup.sh` ran through and
+  **this checkout rebuilds v0.26.2 byte for byte on Linux (4add99d3...)**. (A native macOS build does not: its fonts /
+  libraries render differently, so the Mac port of setup.sh was dropped; work in the container.) First run about 15 minutes on 2 CPUs (Node here is 18.19: enough).
+- **Emulator and v0.26.2 (2026-11-10, emulator only):** `session_ed1.mjs` stops at power-on with "kernel would start
+  firmware task entry 0x50a6e603 ... not modelled" for v0.26.2 (older releases v0.22 / v0.25 / v0.26 / v0.26.1 boot
+  fine; stock boots; every om-emu version since 2026-10-29 behaves the same). 0x50a6e603 + 0x10021020 = 0x60a8f623,
+  the loader task added in v0.26.2. The existing remedy (see "Emulator note" in the sd1 section) works:
+  `OM_WORKER_ENTRY=60a8f623 node tools/emulator/session_ed1_worker.mjs ...` boots, the editor's "OM3E" marker shows
+  and the HSL page renders. `setup.sh` now prints that command; its blank emulator card is formatted by the stock
+  main block, because the build itself cannot format one.
+- **Interactive player with our build (2026-11-10; emulator only; runs on the Mac, not in the container):** it works.
+  Needs (a) om-emu's player (`emu/bin/play.mjs`; Node 24 was enough, README says 26) with the E147 blocks unpacked, (b) a
+  patch file made from the Linux build: `tools/emulator/make_play_patch.py STOCK_DECODED_MAIN BUILD_main.bin OUT.json`
+  (v0.26.2: 111 patches, 72999 bytes; the player prints the patched main sha 22d6ab71..., the Linux build's), (c) the
+  loader task allowed: a local, non-upstream edit of `emu/src/lab/camapp.mjs` (`CA_TASK_ENTRIES` also takes
+  `OM_WORKER_ENTRY`, the entry minus 0x10021020; the lab runs in a worker, so a wrapper script cannot do it), (d) the
+  card: `OM_EMU_CARD=FILE.omsd` (a copy of the container's `card.omsd`; the player writes to it).
+  `OM_EMU_CARD=... OM_WORKER_ENTRY=60a8f623 OM_EMU_NVRAM=off node emu/bin/play.mjs --model E147 --patch OUT.json
+  --no-browser` prints `http://127.0.0.1:PORT/?t=TOKEN`; open it in a browser. Seen: powers on to the shooting screen
+  (COLOR 1), MENU opens the menus (slowly, about 3 s). The page shows a red "patched firmware" line. Not yet driven
+  to our wheel pages by hand. The stock om-emu clone on the Mac is `~/om3-work/om-emu`.
+
+### Where the firmware writes the XMP (2026-11-10; analysis of the stock main block only, nothing run on the camera)
+Runtime address = decoded-file address - 0x50000000 + 0x60021020 (`research/tools/dis.sh` takes runtime addresses).
+- **The packet is built once into a fixed 2301-byte buffer**, then copied out. Builder at about 0x60455fd0..0x60456140
+  (`research/tools/dis.sh 0x60456000 0x60456140`): clears 2301 bytes at object+1554, appends the `<?xpacket begin="` header
+  pieces and the `xmp:Rating="` description with the `strcat`-like helper 0x60024867, then fills the rest with spaces in
+  100-character lines ending in `\n` (101 bytes each) and appends `<?xpacket end="w"?>`. So the free room is whatever is
+  left of those 2301 bytes after the header and `xmp:Rating` (about 2 KB).
+- **JPEG writer** at 0x60455cfa..0x60455d41: writes `FF E1`, the APP1 length **0x091C (2332) as constants**
+  (2332 = 2 + 29 for `http://ns.adobe.com/xap/1.0/\0` + 2301), copies the 29-byte header from 0x6062de38, then
+  **2301 bytes** from the RAM buffer 0x62a982e6, and returns 2334 (marker + length). All three numbers are fixed in code.
+  Consequence: a recipe has to fit inside the existing 2301 bytes (or those constants and every consumer of the
+  returned size must change together).
+- **"XMP Update" function** at about 0x60455d47..0x60455f..: updates one property of the packet in place by ID
+  (messages "XMP Update scheap_alloc() fail", "... Fail Undefined ID", "... Fail status ="; it uses tag 700, the TIFF
+  XMP tag, so the ORF carries the same packet). This is how the Rating is changed after the shot, so a patch could hook
+  here or at the builder.
+- Open: who calls the builder / update (per-shot or at power-on?); whether our look values can be read there;
+  where the ORF's tag-700 data gets its size; spare room in the caller's stack frame for a text formatter.
+
+#### Callers (2026-11-10; analysis of the stock main block; found by disassembling 0x60021020..0x60b00000 and grepping `call`)
+- **Builder 0x60455f0e** (a0 = context object, packet at object+1554; the object is at 0x62a97cd4, so the packet is the
+  RAM buffer 0x62a982e6) has **one caller**: the tiny wrapper 0x60454b05 -> 0x60454b0e, which itself is called once, from
+  0x60218e69 inside a long run of module initialisers separated by debug-print calls (0x60024a01) (function about
+  0x60218cf0..). So **the packet looks like it is built once at power-on, not per shot** (analysis, not yet confirmed).
+  Rating therefore starts as `xmp:Rating="0"` in the buffer; where it later changes is not yet found.
+- **JPEG XMP writer 0x60455cfa**: one caller, 0x60558a64, inside the JPEG header builder: writes `FF D8`, `FF E1`, length,
+  `Exif\0\0`, calls the Exif IFD builder **0x60454b84** (a0 = (12,sp), a1 = buffer+12), then the XMP writer with a1 = where
+  the Exif block ended. So a JPEG is SOI, Exif APP1, XMP APP1. The Exif IFD builder has a second caller (0x6055fe14, a
+  different file path; no XMP writer next to it in that window: not examined).
+- **Function 0x60455d47** (ID in d1, "XMP Update ..." messages) has one caller, 0x608b40f4, in a metadata dispatcher that
+  takes a type (17 / 19 / 260) and then calls 0x608b3ec8. Purpose still unclear: it may edit the packet or be a
+  parser of one read from the card; do not assume it is the Rating setter.
+- **Hook idea (not built):** wrap the JPEG writer 0x60455cfa (runs once per JPEG, so the look at that moment is the look
+  of the shot): rebuild the 2301-byte packet in the RAM buffer with our fields, then fall into the original copy. Needs:
+  our own template that keeps total length 2301 and the `xpacket` begin / end framing; the current Rating (find where it
+  changes); to check the ORF path (tag 700) reads the same buffer.
+
+#### Rating, and where the look is at shot time (2026-11-10; analysis of the stock main block and our source)
+- **Rating is a one-digit in-place edit.** Helper 0x604580c2 (a0 = packet, d0 = rating): checks the 17-byte `<?xpacket begin="`
+  header (0x6002488b = memcmp), finds `xmp:Rating="` (12 bytes) within the first 230 bytes, clamps the rating to 5 and
+  overwrites the ASCII digit at +12; returns 0 changed / 2 same / 1 not found. Its only two callers are both in function
+  0x60455d47 (the "XMP Update" one): one edits a packet read back into a heap buffer (scheap_alloc, read 0x604537b0, write
+  0x604537e5), the other edits the RAM packet kept in the context (a2+92). So it is the playback / later rating change; a
+  fresh shot keeps the power-on `xmp:Rating="0"`. Consequence for a hook on the JPEG writer: our added attribute must stay
+  **after** the Rating digit (and the Rating search window is the first 230 bytes), and a later in-camera rating edit
+  on the file only touches that one digit, so our fields survive it.
+- **Padding helpers** 0x6045812d (copy a string into a field, space-padded) and 0x60458165 (same, from a heap string) are the
+  builder's way of filling fixed-width fields; the builder is long (many fixed fields), so the Exif block is also
+  a fixed template.
+- **Look at shot time:** `xb_slot` (xblock.s:65) already returns, at capture, the slot entry S (64 bytes, bytes +0..+58 used:
+  hue / light / WB / Blacks / Whites / Glow-Clarity / Art / NR / VigFix / Grain / Sharp / split-tone colours and strengths)
+  of the effective COLOR 1..4 profile (getter 63153), or 0 when none. `xb_own` says whether COLOR k shows its own settings;
+  when a film is selected (P+712+k = 1..5) the film's EDITS.BIN block (P+820) holds the film's values instead. So a
+  writer hook can read the look the way the capture hooks do; the film name / index and the stock picture-mode
+  values (camera tags, e.g. Contrast / Sharp) would come from the film block and the camera's own Exif.
+- Open: the exact byte-to-field map of the slot for every look (it is in editor.s / `webapp` `Look` and `LOOKS.BIN`
+  record layout; reuse it, do not invent a second one); how a film's identity is recorded (name vs index); whether
+  hooking the writer (0x60455cfa, frame [d2],8) leaves room for a text formatter in ext sections / the GUIDES block.
+
+## Panasonic / Leica aperture ring: prior art and first look (2026-11-10; analysis only, nothing built)
+
+- Prior art: fishcu/oly_fw_analysis PR #4 (author flickering-star), PEN-F 3.1: the body never asks the lens for the
+  ring position; the patch sets option bit `req+21 |= 1` on the `C1 80` / `81 E3` lens-status requests, reads the extra
+  little-endian word in the status parser, and in A and M modes replaces the "aperture point" (`InfoGet(0x80ca)`) in the
+  AE snapshot with the ring value clamped to the lens's official min/max. Ring value 0x8000 = ring at A, body value kept.
+  Camera-reported working on PEN-F with Leica 15 mm, 10-25 mm, 25-50 mm (reported by the contributor; we cannot check).
+- cakelesscoder/caduceus-ep7 `docs/APERTURE_RING.md` + issue #14: E-P7 port, emulator-verified, never camera-tested, then
+  parked and named a top bootloop suspect (state word written into loaded section 1). Their README: "needs a redesign,
+  starting with a read-only probe". We do not touch their repo; read-only reference.
+- OM-3 1.1 first look (decoded main, base 0x60021020; byte-signature search, no disassembly review yet):
+  status parser store sequence (`movbu (a3),d0; mov (4,sp),a0; inc a3; movbu d0,(17,a0)`) found once at 0x602fcbc3;
+  lens device getter prefix found once at 0x602f64a2. Both are byte-identical to E-P7. The dispatcher and the AE
+  aperture-point call were NOT found with the E-P7 byte signatures (call targets differ; needs tracing). Status: analysis.
+
+#### Emulator check of the stock XMP packet and writer (2026-11-10; emulator only, stock image, `tools/emulator/xmp_check.mjs`)
+- **The RAM packet is not built in the emulator**: after boot and after a half-press the 2301 bytes at 0x62a982e6 are all
+  zero, and an exec trace shows the builder 0x60455f0e, its wrapper 0x60454b05 and the init caller 0x60218e69 never
+  run. So "built once at power-on" (written above from reading the code) is **not confirmed**: either that init function
+  runs later (a mode or the first capture) or the emulator never reaches it. The camera's own JPEGs do carry the packet
+  (stock sample, 2026-11-09), so on the camera it is built before a shot.
+- **The stock writer cannot be run directly**: calling 0x60455cfa from a one-instruction stub (as its caller does) writes
+  `FF E1 09 1C` and then faults at the first helper call, `call 0x50002909` (the memcpy; "MN10300 trap reason=4
+  pc=0x50002909 address=0x71"): the code the emulator holds at 0x50002909 is not the library function (the bytes there
+  decode as the middle of another instruction). Nothing in a normal boot executes 0x50002909 either. The 0x5000xxxx
+  helpers (0x50002900 / 0x50002909 / 0x50002a15) are used by the builder and the writer and are missing from the emulator.
+- **Consequence:** the hook cannot be tested end to end in the emulator. What can be: our own formatter (it calls no ROM
+  helper) on a hand-made stock-shaped packet, and the hook stub up to the point where it hands back to the stock writer.
+  The real hook behaviour is camera-only.
