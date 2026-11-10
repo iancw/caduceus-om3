@@ -2349,3 +2349,16 @@ Question (owner): can the dial's positions each pick a COLOR / FILM look (e.g. A
   (does a capture on a remapped ART position use the film? not run); the mapping table is poked, not read from a card
   file; on a camera the table must live in a P-block / card file (the image is read-only flash); the dial's real
   detents / timing are untested. Nothing here has been on a camera.
+
+### Looking for room for the in-camera dial assignment (2026-11-10; analysis, branch experiment/dial-probe)
+- Owner wants the dial -> film assignment chosen on the camera. That needs: an assign gesture + readout, a 4-entry table in
+  the P block, and saving it (EDITS.BIN format or a new file) - roughly 0.6-1 KB of code (estimate, not measured).
+- ext11 (the only big proven area, 64 KiB at 0x60f49800) is 65520 B of 65536 with the dial hook. What fills it: pictures
+  and data, not code: ic_pay 14720 (14 icon streams, no waste: 12 B blanks only), film cell pictures fl_sdg 4320, fl_sgd
+  4132, fl_lvd 3520, fl_dig 3240, fl_ldig 2880, fl_llab 2028, fl_tops 2000, fl_top 2000, fl_slab 1996, fl_sfw 1488,
+  fl_ltop 1230, fl_hlab 1196, fl_lvw 1144, it_tab 1000, fl_l0/l1/l2 816 each (about 46 KB of the 64 KiB).
+- Merging the duplicated facade GetValue / SetValue sequences (11 sites, 6 distinct shapes) would save under ~100 B.
+- Other sections ext1-ext10 tails are full (notes above); the GUIDES.BIN code block is near its 16448 B cap.
+- Real room: section 6's unloaded gap is 1005568 B; 4 KiB (GX1) and 64 KiB (GX2) were camera-proven by moving the loader
+  end word 0x60045e9c; a larger step needs its own camera probe (the old probe branches are not in this repository; only
+  the notes above remain). The emulator maps the gap, so emulator-only work can use it, but it proves nothing for the camera.
