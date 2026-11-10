@@ -174,6 +174,25 @@ export function profilesBin(bank: Bank, fw: Fw = 22): Uint8Array {
   d.setUint32(8, crc32(b.subarray(12)), true);
   return b;
 }
+/** One 64-byte LOOKS.BIN record (docs/FORMATS.md) -> a look. Shared by readProfiles and the photo reader (xmp.ts). */
+export function lookFromRecord(rec: Uint8Array, name: string): Look {
+  const b = rec, s = (i: number) => (b[i] << 24) >> 24, a = (at: number) => Array.from({ length: 12 }, (_, i) => s(at + i));
+  const l = blankLook('colour', name.slice(0, OM3_NAME_MAX).trim() || 'Look');
+  l.hue = a(0); l.light = a(12); l.sat = a(24);
+  l.wb = b[36] & 1 ? { a_b: s(37), g_m: s(38) } : null;
+  l.tone = { ...zeroTone(), blacks: s(39), whites: s(40), shadows: s(44), midtones: s(45), highlights: s(46) };
+  l.advice = { contrast: s(41), sharpness: s(52) || s(42) }; l.vignette = s(43);      // v0.22 Sharp (+52), else the stock one
+  const fx = s(47);
+  l.effect = fx < 0 ? { type: 'bloom', strength: Math.min(OM3.fx, -fx) } : fx > 0 ? { type: 'clarity', strength: Math.min(OM3.fx, fx) } : null;
+  const art = ARTS[b[48]] ?? 'off';
+  l.art_effect = art === 'blur' ? 'off' : art;
+  l.grain = OM3_NR[b[49]] ?? 'off';
+  if (b[50] === 0) l.lens_correction = true;
+  if (b[51] >= 1) l.film_grain = Math.min(OM3.grain, b[51]);
+  const sp = parseSplit({ sh_color: b[53], sh: s(54), hl_color: b[55], hl: s(56) });
+  if (sp) l.split = sp;
+  return l;
+}
 /** A camera LOOKS.BIN -> bank. Used numbers without a name (made on the camera) become "Look n". */
 export function readProfiles(b: Uint8Array): Bank {
   const d = new DataView(b.buffer, b.byteOffset, b.byteLength);
@@ -182,24 +201,10 @@ export function readProfiles(b: Uint8Array): Bank {
   if (d.getUint16(12, true) !== 1 || d.getUint16(14, true) !== 20) throw new Error('This LOOKS.BIN has an unknown version.');
   const bank = emptyBank();
   for (let r = 0; r < 20; r++) {
-    const o = 32 + 64 * r, s = (i: number) => d.getInt8(o + i), a = (at: number) => Array.from({ length: 12 }, (_, i) => s(at + i));
+    const o = 32 + 64 * r;
     let name = ''; for (let i = 0; i < 15; i++) { const c = b[1312 + 16 * r + i]; if (!c) break; name += String.fromCharCode(c); }
     if (!name && !b.subarray(o, o + 57).some(Boolean)) continue;
-    const l = blankLook('colour', (name || `Look ${(r % 5) + 1}`).slice(0, OM3_NAME_MAX).trim() || 'Look');
-    l.hue = a(0); l.light = a(12); l.sat = a(24);
-    l.wb = b[o + 36] & 1 ? { a_b: s(37), g_m: s(38) } : null;
-    l.tone = { ...zeroTone(), blacks: s(39), whites: s(40), shadows: s(44), midtones: s(45), highlights: s(46) };
-    l.advice = { contrast: s(41), sharpness: s(52) || s(42) }; l.vignette = s(43);      // v0.22 Sharp (+52), else the stock one
-    const fx = s(47);
-    l.effect = fx < 0 ? { type: 'bloom', strength: Math.min(OM3.fx, -fx) } : fx > 0 ? { type: 'clarity', strength: Math.min(OM3.fx, fx) } : null;
-    const art = ARTS[b[o + 48]] ?? 'off';
-    l.art_effect = art === 'blur' ? 'off' : art;
-    l.grain = OM3_NR[b[o + 49]] ?? 'off';
-    if (b[o + 50] === 0) l.lens_correction = true;
-    if (b[o + 51] >= 1) l.film_grain = Math.min(OM3.grain, b[o + 51]);
-    const sp = parseSplit({ sh_color: b[o + 53], sh: s(54), hl_color: b[o + 55], hl: s(56) });
-    if (sp) l.split = sp;
-    bank[Math.floor(r / 5)][r % 5] = l;
+    bank[Math.floor(r / 5)][r % 5] = lookFromRecord(b.subarray(o, o + 64), name || `Look ${(r % 5) + 1}`);
   }
   return bank;
 }
