@@ -432,12 +432,14 @@ def build(defaults, testfile, out):
     xtag = 0x58000000 | int.from_bytes(hashlib.sha256(bytes(m)).digest()[:3], 'little')
     struct.pack_into('<I', m, o(tr) + 2, xtag)
     xblock = make_xblock(out, sy, xtag)
+    for lit in (b'xmp:Rating="', b'<?xpacket end="', b'"/>\n </rdf:RDF>\n</x:xmpmeta>\n'):      # the stock packet texts the block's xb_xfmt looks for
+        assert lit in bytes(m), f'stock main block lacks {lit!r}: xblock.s xb_xrat / xb_xend / xb_xtail need checking'
     subprocess.run([sys.executable, ROOT / 'card' / 'mkguides.py', out / 'pictures.bin', '--tones', out / 'TONES.BIN'], check=True)   # v0.26: TONES.BIN
     subprocess.run([sys.executable, ROOT / 'card' / 'mklabels.py', out / 'LABELS.BIN'], check=True)
     g = bytearray((out / 'pictures.bin').read_bytes()); assert g[:4] == b'OM3G' and len(g) % 4 == 0
     g += xblock
     struct.pack_into('<I', g, 4, len(g)); struct.pack_into('<I', g, 8, zlib.crc32(bytes(g[12:])) & 0xffffffff)
-    assert len(g) <= 24576
+    assert len(g) <= 16448, f'GUIDES.BIN {len(g)} B is over the 16448 B malloc cap'
     (out / 'GUIDES.BIN').write_bytes(bytes(g))
     hdr, trl = mc['hdr'], bytearray(mc['trl'])
     struct.pack_into('<I', trl, 28, 0)
@@ -467,6 +469,31 @@ def build(defaults, testfile, out):
     return syms
 
 
+def xmp_include():
+    """docs/xmp-fields.json -> the code block's include `xmp_tab.inc`: the namespace text and one macro line per field
+    (XVER, XLOOK, XFILM, XNUM, XLIST in xblock.s) in the file's order, and XB_XMP_MAX, the longest text those lines can
+    write (the block refuses to write fields into a packet whose free gap is smaller)."""
+    j = json.loads((ROOT / 'docs' / 'xmp-fields.json').read_text())
+    pre, ns = j['prefix'], j['namespace']
+    assert pre == 'cad' and j['version'] == 1 and '"' not in ns and '\\' not in ns     # the macros spell ` cad:NAME="` and "1"
+    s = f' xmlns:{pre}="{ns}"'
+    lines = [' .text 1', 'xb_xns:', f' .asciz "{s.replace(chr(34), chr(92) + chr(34))}"', ' .text 0', ' mov xb_xns,a0', ' call xb_put_str,[],0']
+    mx = len(s)
+    for f in j['fields']:
+        pf = len(f' {pre}:{f["name"]}="')
+        k = f['kind']
+        if k == 'version': lines.append(f' XVER {f["name"]}'); mx += pf + 2
+        elif k == 'look': lines.append(f' XLOOK {f["name"]}'); mx += pf + 15 + 1
+        elif k == 'film': lines.append(f' XFILM {f["name"]}'); mx += pf + 2 + 1
+        else:
+            w = max(len(str(v)) for v in range(f['min'], f['max'] + 1))
+            assert 0 <= f['off'] < 64
+            if k == 'num': lines.append(f' XNUM {f["name"]}, {f["off"]}'); mx += pf + w + 1
+            elif k == 'list12': lines.append(f' XLIST {f["name"]}, {f["off"]}'); mx += pf + 12 * w + 11 + 1
+            else: raise SystemExit(f'xmp-fields.json: unknown kind {k}')
+    return '\n'.join(lines) + f'\n .set XB_XMP_MAX, {mx}\n', mx
+
+
 def make_xblock(out, sy, xtag):
     """Assemble the code block, link it at two bases, find the 32-bit fields that move (+delta absolute, -delta
     PC-relative to the firmware), check that relocating the first link gives the second, and pack the block."""
@@ -481,6 +508,9 @@ def make_xblock(out, sy, xtag):
     subprocess.run([sys.executable, ROOT / 'card' / 'mklabels.py', out / 'LABELS.BIN'], check=True, capture_output=True)
     inc += f'.set XL_FILE, {(out / "LABELS.BIN").stat().st_size}\n'      # v0.25: LABELS.BIN v3 (+ the WB cell glyphs)
     (out / 'wbglyph.inc').write_text(inc)
+    inc_text, xmp_max = xmp_include()                 # the look in the photo (docs/FORMATS.md "XMP fields")
+    (out / 'xmp_tab.inc').write_text(inc_text)
+    assert xmp_max + 48 + 600 < 2301 - 19, f'XMP fields too long for the packet ({xmp_max})'   # 600: the most the packet may hold before the Rating digit (xb_xfmt searches that far)
     subprocess.run([P.AS, '-I', out, '-o', out / 'xb.o', XB_SRC], check=True)
     imgs, xs = [], None
     for L in (XB_L1, XB_L2):

@@ -58,6 +58,8 @@ xb_base:
  .balign 8
  jmp xb_wbc                       /* +144 v0.25: the WB grid row's left cell picture (wb_draw, `calls`) */
  .balign 8
+ jmp xb_xmp                      /* +152 look in the photo: the JPEG XMP writer's hook (`calls`, a0 = the packet buffer) */
+ .balign 8
 xb_nrel:
  .long 0                          /* relocation count (written by the build) */
 
@@ -2675,5 +2677,349 @@ xb_wgp:                           /* per glyph: row pointer (+0), width (+20), x
  .long 0, 0, 0, 0, 0
  .long 0, 0, 0, 0, 0
  .long 0, 0, 0, 0, 0
+/* ---- The look in the photo (docs/superpowers/specs/2026-11-10-look-in-photo-xmp-design.md, docs/FORMATS.md "XMP fields").
+ * xb_xmp (+152): the stock JPEG XMP writer (0x60455cfa) is hooked to call this once per JPEG with a0 = the 2301-byte packet
+ * buffer (0x62a982e6). It rewrites the packet from the closing quote of xmp:Rating="N" up to the end marker: our cad: fields
+ * (when COLOR 1..4 is the effective profile) + the stock tail + blank padding; the packet length, the end marker and the
+ * Rating digit stay. Nothing is written when the packet is not a built stock packet (the emulator never builds one).
+ * Text lines come from `xmp_tab.inc` (build.py, from docs/xmp-fields.json), so names, order and offsets are the contract's.
+ * Stores: the packet region [ins, end marker), xb_xrec, its own stack. Calls the editor's pf_capto (as xb_lkd does). */
+ .macro XPFX name                 /* append ` cad:NAME="` (the prefix is "cad": build.py checks docs/xmp-fields.json) */
+ .text 1
+xmps\@:
+ .ascii " cad:"
+ .ascii "\name"
+ .asciz "=\""
+ .text 0
+ mov xmps\@,a0
+ call xb_put_str,[],0
+ .endm
+ .macro XVER name
+ XPFX \name
+ mov 49,d0                        /* "1" */
+ movbu d0,(a3)
+ inc a3
+ call xb_put_q,[],0
+ .endm
+ .macro XFILM name
+ XPFX \name
+ mov d3,d0
+ call xb_put_s,[],0
+ call xb_put_q,[],0
+ .endm
+ .macro XLOOK name                /* only with a film's name: (8,sp) = its address */
+ mov (8,sp),a0
+ cmp 0,a0
+ beq 1f
+ movbu (a0),d0
+ cmp 0,d0
+ beq 1f
+ XPFX \name
+ mov (8,sp),a0
+ call xb_put_name,[],0
+ call xb_put_q,[],0
+1:
+ .endm
+ .macro XNUM name, off
+ XPFX \name
+ movbu (\off,a2),d0
+ extb d0
+ call xb_put_s,[],0
+ call xb_put_q,[],0
+ .endm
+ .macro XLIST name, off
+ XPFX \name
+ clr d2
+1:
+ mov a2,a0
+ add d2,a0
+ movbu (\off,a0),d0
+ extb d0
+ call xb_put_s,[],0
+ inc d2
+ cmp 12,d2
+ beq 2f
+ mov 44,d0                        /* "," */
+ movbu d0,(a3)
+ inc a3
+ bra 1b
+2:
+ call xb_put_q,[],0
+ .endm
+
+xb_put_q:                         /* leaf: append a quote at a3. Uses d0 */
+ mov 34,d0
+ movbu d0,(a3)
+ inc a3
+ retf [],0
+xb_put_str:                       /* leaf: a0 = NUL-ended text -> appended at a3. Uses d0, a0 */
+1:
+ movbu (a0),d0
+ cmp 0,d0
+ beq 2f
+ movbu d0,(a3)
+ inc a3
+ inc a0
+ bra 1b
+2:
+ retf [],0
+xb_put_s:                         /* leaf: d0 = signed byte value -> decimal text at a3 (magnitude capped at 99). Uses d0, d1 */
+ cmp 0,d0
+ bge 1f
+ mov 45,d1                        /* "-" */
+ movbu d1,(a3)
+ inc a3
+ mov d0,d1
+ clr d0
+ sub d1,d0
+1:
+ cmp 99,d0
+ ble 2f
+ mov 99,d0
+2:
+ clr d1
+3:
+ cmp 10,d0
+ blt 4f
+ add -10,d0
+ inc d1
+ bra 3b
+4:
+ cmp 0,d1
+ beq 5f
+ add 48,d1
+ movbu d1,(a3)
+ inc a3
+5:
+ add 48,d0
+ movbu d0,(a3)
+ inc a3
+ retf [],0
+xb_put_name:                      /* leaf: a0 = look name (NUL-ended) -> at most 15 characters at a3; anything outside
+                                     0x20..0x7e and & < > " ' becomes "_". Uses d0, d1, a0 */
+ mov 15,d1
+1:
+ movbu (a0),d0
+ cmp 0,d0
+ beq 9f
+ cmp 32,d0
+ blt 2f
+ cmp 126,d0
+ bgt 2f
+ cmp 38,d0
+ beq 2f
+ cmp 60,d0
+ beq 2f
+ cmp 62,d0
+ beq 2f
+ cmp 34,d0
+ beq 2f
+ cmp 39,d0
+ bne 3f
+2:
+ mov 95,d0
+3:
+ movbu d0,(a3)
+ inc a3
+ inc a0
+ add -1,d1
+ bne 1b
+9:
+ retf [],0
+xb_memeq:                         /* `call xb_memeq,[d2],8`: a0, a1 = texts, d0 = length -> d0 1 when equal, else 0 */
+ mov d0,d2
+1:
+ movbu (a0),d0
+ movbu (a1),d1
+ cmp d1,d0
+ bne 8f
+ inc a0
+ inc a1
+ add -1,d2
+ bne 1b
+ mov 1,d0
+ ret [d2],8
+8:
+ clr d0
+ ret [d2],8
+
+/* xb_xfmt: `call xb_xfmt,[d2,d3,a2,a3],44`: a0 = packet (2301 B), a1 = a 64-byte LOOKS.BIN record or 0, d0 = film 0..20,
+ * d1 = the look's name (NUL-ended) or 0 -> d0 1 when the fields were written, 0 when not (no record, little room, or no
+ * built packet: then the packet is left alone, or gets only the stock tail when an earlier shot's fields are in it). Locals (4) packet (8) name (12) ins (16) end
+ * marker (20) result. The free gap is end marker - ins (d2). */
+xb_xfmt:
+ mov a0,(4,sp)
+ mov a1,a2
+ mov d0,d3
+ mov d1,(8,sp)
+ clr d2
+1:                                /* xmp:Rating=" (the stock packet has it at about +230; its own rating edit tries +230 first, then searches) */
+ mov (4,sp),a0
+ add d2,a0
+ movbu (a0),d0
+ cmp 120,d0
+ bne 2f
+ mov xb_xrat,a1
+ mov 12,d0
+ call xb_memeq,[d2],8
+ cmp 1,d0
+ beq 3f
+2:
+ inc d2
+ cmp 600,d2
+ bne 1b
+ bra 90f
+3:
+ mov (4,sp),a0
+ add d2,a0
+ movbu (13,a0),d0                 /* the closing quote of the rating */
+ cmp 34,d0
+ bne 90f
+ add 14,a0
+ mov a0,(12,sp)                   /* ins */
+ clr d2
+4:                                /* the end marker, first one at or after ins */
+ mov (12,sp),a0
+ add d2,a0
+ mov (4,sp),a1
+ add 2286,a1
+ cmp a1,a0
+ bcc 90f
+ movbu (a0),d0
+ cmp 60,d0
+ bne 5f
+ mov xb_xend,a1
+ mov 15,d0
+ call xb_memeq,[d2],8
+ cmp 1,d0
+ beq 6f
+5:
+ inc d2
+ bra 4b
+6:
+ mov (12,sp),a0
+ add d2,a0
+ mov a0,(16,sp)                   /* end marker */
+ cmp 40,d2
+ bcs 90f                          /* too little room even for the tail: leave the packet alone */
+ mov (12,sp),a3
+ clr d0
+ mov d0,(20,sp)
+ cmp 0,a2
+ bne 7f
+ movbu (a3),d0
+ cmp 47,d0                        /* "/": the stock tail starts at ins, nothing of ours to remove */
+ beq 90f
+ bra 8f                           /* no look but fields of an earlier shot: back to the stock tail */
+7:
+ cmp XB_XMP_MAX + 48,d2
+ bcs 8f
+ .include "xmp_tab.inc"
+ mov 1,d0
+ mov d0,(20,sp)
+8:
+ mov xb_xtail,a0
+ call xb_put_str,[],0
+ mov (16,sp),a0
+ mov 32,d0
+9:
+ cmp a0,a3
+ bcc 10f
+ movbu d0,(a3)
+ inc a3
+ bra 9b
+10:
+ mov (20,sp),d0
+ ret [d2,d3,a2,a3],44
+90:
+ clr d0
+ ret [d2,d3,a2,a3],44
+
+/* xb_xmp (+152): `calls` with a fresh return slot, a0 = the packet buffer; every register kept; d0 = xb_xfmt's result.
+ * The look at this moment = what the capture hooks read: the effective COLOR k (getter 63153) -> pf_capto into xb_xrec; the
+ * selected film (P+LIDX+k = 1..5) -> film 5k + v and its name in the loaded LOOKS.BIN (names at +1312, 16 B each). */
+xb_xmp:
+ movm [d2,d3,a2,a3],(sp)
+ add -44,sp
+ mov a0,(4,sp)                    /* the packet */
+ clr d3
+ mov d3,(8,sp)                    /* name: none */
+ mov d3,(12,sp)                   /* record: none */
+ mov 63153,d0
+ clr d1
+ mov 0,a0
+ call getter,[d2,d3],12           /* the getter may use a2 / a3: P is fetched after it */
+ extbu d0
+ add -1,d0
+ cmp 4,d0
+ bcc 5f                           /* not COLOR 1..4 */
+ mov d0,d2                        /* k */
+ call xb_p,[],0
+ cmp 0,a1
+ beq 5f
+ mov a1,a2                        /* P */
+ mov xb_xrec,a3
+ mov 64,d1
+ clr d0
+1:
+ movbu d0,(a3)
+ inc a3
+ add -1,d1
+ bne 1b
+ mov xb_xrec,a3
+ call PF_CAPTO,[d2,d3,a2,a3],28   /* a2 = P, d2 = k, a3 = the scratch record (keeps d2/d3/a2/a3) */
+ mov xb_xrec,a0
+ mov a0,(12,sp)
+ mov a2,a0
+ add d2,a0
+ movbu (P_LIDX,a0),d3
+ extb d3
+ cmp 1,d3
+ blt 5f
+ cmp 5,d3
+ bgt 5f
+ mov (P_LPTR,a2),a0
+ cmp 0,a0
+ beq 5f
+ mov d2,d0
+ asl2 d0
+ add d2,d0
+ add d3,d0
+ add -1,d0                        /* r = 5k + v - 1 */
+ mov d0,d1
+ asl 4,d1
+ add 1312,d1
+ add d1,a0
+ mov a0,(8,sp)                    /* the name */
+ add 1,d0
+ mov d0,d3                        /* film = r + 1 */
+ bra 6f
+5:
+ clr d3
+ clr d0
+ mov d0,(8,sp)                    /* no film: no name (the record, if any, stays) */
+6:
+ mov (4,sp),a0
+ mov (12,sp),a1
+ mov d3,d0
+ mov (8,sp),d1
+ call xb_xfmt,[d2,d3,a2,a3],44
+ add 44,sp
+ movm (sp),[d2,d3,a2,a3]
+ rets
+
+ .balign 4
+xb_xrec:                          /* xb_xmp's scratch record */
+ .space 64
+ .text 1
+xb_xrat:
+ .ascii "xmp:Rating=\""
+xb_xend:
+ .ascii "<?xpacket end=\""
+xb_xtail:
+ .asciz "/>\n </rdf:RDF>\n</x:xmpmeta>\n"
+ .text 0
+
+ .text 1
  .balign 4
 xb_end:
