@@ -119,6 +119,10 @@ if (process.env.XMP_FMT_DIR) {
     // a packet that is not a built stock packet (all zero): untouched, 0 returned
     put(PACKET, Buffer.alloc(PACKET_LEN)); const rz = call(PACKET, REC, 1, 0);
     fmt.cases.push({ name: '(unbuilt packet)', call: rz, ok: rz.done && rz.d0 === 0 && Buffer.from(rd(PACKET, PACKET_LEN)).equals(Buffer.alloc(PACKET_LEN)) });
+    // a packet whose text after the Rating is not a stock tail (nor our fields): untouched even with a record
+    const odd = stock(); odd[Buffer.from(odd).toString('latin1').indexOf('xmp:Rating="') + 14] = 0x58; put(PACKET, odd); put(REC, Buffer.from(golden.cases[0].record, 'hex'));
+    const ro = call(PACKET, REC, 1, 0);
+    fmt.cases.push({ name: '(not a stock tail after the Rating: untouched)', call: ro, ok: ro.done && ro.d0 === 0 && Buffer.from(rd(PACKET, PACKET_LEN)).equals(odd) });
     // a second look over the first (idempotent: nothing left of the earlier one)
     const c0 = golden.cases[0], c1 = golden.cases[1]; put(PACKET, stock());
     for (const c of [c0, c1]) { put(REC, Buffer.from(c.record, 'hex')); put(NAME, [...Buffer.from(c.name, 'latin1'), 0]); call(PACKET, REC, c.film, c.name ? NAME : 0); }
@@ -193,6 +197,18 @@ if (process.env.XMP_HOOK && fmt) {
     dd.write(P + 712, Uint8Array.from([5])); setName(4, ascii('Film Five'));
     const d5 = runHook(Buffer.from(a.got));
     add('film 5 over a packet that held film 3', common(d5) && d5.fields.includes('cad:Film="5"') && !d5.fields.includes('Portra 400') && !d5.fields.includes('cad:Film="3"'));
+    // (f) the restore hook at the writer's return, 0x60455d39 (stock: mov 2301,a0; add d2,a0; ret [d2],8), entered as the writer's own frame:
+    // after the copy the master packet must be the stock one again (nothing later, e.g. a RAW's metadata, may inherit this shot's look)
+    dd.write(P + 712, Uint8Array.from([3])); setName(2, ascii('Portra 400'));
+    const f0 = runHook();
+    { const saved = dd.m.getRegs().slice(), sp = ((saved[8] - 0x800) & ~3) >>> 0, stub = (sp - 0x100) >>> 0, rel = (0x60455d39 - stub) | 0, D2 = 0xa2100000 + 0x20000;
+      dd.write(stub, Uint8Array.from([0xdd, rel & 255, rel >> 8 & 255, rel >> 16 & 255, rel >>> 24 & 255, 0x80, 0x08, 0xcb, 0xcb]));
+      const r = saved.slice(); r[9] = stub; r[8] = sp; r[2] = D2; r[4] = 0x44444444; dd.m.setRegs(r);
+      let n = 0; while ((dd.m.getRegs()[9] >>> 0) !== stub + 7 && n < 3000000) { dd.m.step(); n++; }
+      const g = dd.m.getRegs(), done = (g[9] >>> 0) === stub + 7, a0 = g[4] >>> 0, d2 = g[2] >>> 0; dd.m.setRegs(saved);
+      const v = view(), squash = (x) => x.replace(/\s+/g, '');
+      add('restore hook: fields gone after the writer copied them, a0 = d2 + 2301, d2 kept', f0.fields.includes('cad:Film="3"') && done && a0 === D2 + 2301 && d2 === D2 && !v.s.includes('cad:') && squash(v.s) === squash(stockPkt().toString('latin1')) && v.got.length === PACKET_LEN && v.s.endsWith('<?xpacket end="w"?>'), { done, a0: a0.toString(16), d2: d2.toString(16), had_fields: f0.fields.length });
+    }
     // restore the poked state
     dd.write(P + 712, Uint8Array.from([oldLidx])); dd.write(nameAt(2), Uint8Array.from(oldName)); dd.write(nameAt(4), Uint8Array.from(oldName3));
     scen.ok = scen.cases.every((x) => x.ok);
@@ -208,8 +224,8 @@ const res = {
 };
 fs.writeFileSync(OUT, JSON.stringify(res, null, 1));
 console.log(JSON.stringify({ ...res, packet_hex: undefined }));
-if (fmt && !fmt.ok) { console.error('FORMATTER CHECK FAILED'); process.exit(1); }
-if (fmt) console.log('FORMATTER CHECK PASSED:', fmt.cases.length, 'cases');
-if (hook && !hook.ok) { console.error('HOOK CHECK FAILED', JSON.stringify(hook)); process.exit(1); }
-if (hook) console.log('HOOK CHECK PASSED');
-if (scen) { for (const c of scen.cases) console.log(c.ok ? '  ok  ' : '  FAIL', c.name); if (!scen.ok) { console.error('SCENARIOS FAILED'); process.exit(1); } console.log('SCENARIOS PASSED:', scen.cases.length); }
+if (fmt && !fmt.ok) { console.error('FORMATTER CHECK FAILED:', fmt.cases.filter((c) => !c.ok).map((c) => c.name).join('; ')); process.exitCode = 1; }
+if (fmt && fmt.ok) console.log('FORMATTER CHECK PASSED:', fmt.cases.length, 'cases');
+if (hook && !hook.ok) { console.error('HOOK CHECK FAILED', JSON.stringify(hook)); process.exitCode = 1; }
+if (hook && hook.ok) console.log('HOOK CHECK PASSED');
+if (scen) { for (const c of scen.cases) console.log(c.ok ? '  ok  ' : '  FAIL', c.name); if (!scen.ok) { console.error('SCENARIOS FAILED'); process.exitCode = 1; } else console.log('SCENARIOS PASSED:', scen.cases.length); }

@@ -13,6 +13,7 @@ SECTIONS {
   .hook_c1e     0x605053cc : { *(.hook_c1e) }
   .hook_wl      0x604b8d91 : { *(.hook_wl) }
   .hook_xmp     0x60455cfa : { *(.hook_xmp) }
+  .hook_xmp2    0x60455d39 : { *(.hook_xmp2) }
   .hook_tone    0x605197d7 : { *(.hook_tone) }
   .hook_fx      0x60555e50 : { *(.hook_fx) }
   .hook_lv      0x6046b8bb : { *(.hook_lv) }
@@ -68,6 +69,7 @@ pgm_back      = 0x611c3710;
 rsp_back      = 0x611c3cbd;
 sf_stock      = 0x604be2aa;
 wl_back       = 0x604b8d99;         /* ft8: after the work-list key read */
+xmp_back2     = 0x60455d3e;         /* the look in the photo: the writer's `ret [d2],8` after its copy */
 xmp_back      = 0x60455cff;         /* the look in the photo: after the writer's two displaced entry instructions */
 su_stock      = 0x604b97db;
 prop_set      = 0x610cd5c4;

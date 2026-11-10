@@ -60,6 +60,8 @@ xb_base:
  .balign 8
  jmp xb_xmp                      /* +152 look in the photo: the JPEG XMP writer's hook (`calls`, a0 = the packet buffer) */
  .balign 8
+ jmp xb_xmpr                     /* +160 look in the photo: after the writer copied the packet, back to the stock tail (`calls`, a0 = the packet buffer) */
+ .balign 8
 xb_nrel:
  .long 0                          /* relocation count (written by the build) */
 
@@ -2905,12 +2907,17 @@ xb_xfmt:
  mov (12,sp),a3
  clr d0
  mov d0,(20,sp)
+ movbu (a3),d1
+ cmp 47,d1                        /* "/": a stock tail starts at ins */
+ beq 11f
+ cmp 32,d1                        /* " ": the fields of an earlier shot */
+ bne 90f                          /* anything else is not a packet we know: leave it alone */
  cmp 0,a2
- bne 7f
- movbu (a3),d0
- cmp 47,d0                        /* "/": the stock tail starts at ins, nothing of ours to remove */
- beq 90f
- bra 8f                           /* no look but fields of an earlier shot: back to the stock tail */
+ beq 8f                           /* no look but fields of an earlier shot: back to the stock tail */
+ bra 7f
+11:
+ cmp 0,a2
+ beq 90f                          /* no look and a stock tail: nothing of ours to remove */
 7:
  cmp XB_XMP_MAX + 48,d2
  bcs 8f
@@ -3004,6 +3011,20 @@ xb_xmp:
  mov d3,d0
  mov (8,sp),d1
  call xb_xfmt,[d2,d3,a2,a3],44
+ add 44,sp
+ movm (sp),[d2,d3,a2,a3]
+ rets
+
+/* xb_xmpr (+160): `calls`, a0 = the packet buffer; every register kept. The writer has copied the packet into the photo;
+ * the master packet (part of the Exif context object the firmware also copies for the RAW's metadata) goes back to the stock
+ * tail, so nothing but this JPEG ever carries this shot's look. */
+xb_xmpr:
+ movm [d2,d3,a2,a3],(sp)
+ add -44,sp
+ clr d0
+ clr d1
+ mov 0,a1
+ call xb_xfmt,[d2,d3,a2,a3],44    /* no record: only an earlier shot's fields are removed */
  add 44,sp
  movm (sp),[d2,d3,a2,a3]
  rets

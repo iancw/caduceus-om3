@@ -68,6 +68,7 @@ HOOKS = {'.hook_color': (0x60518615, bytes.fromhex('cd6cfdf060')),
          '.hook_sel2': (0x60504b5d, bytes.fromhex('dddc830200a00c')),
          '.hook_c1e': (0x605053cc, bytes.fromhex('fa129800dff01c')),
          '.hook_xmp': (0x60455cfa, bytes.fromhex('2cff00f051')),   # the look in the photo: the JPEG XMP writer's entry (mov 255,d0; movbu d0,(a1)) -> block +152
+         '.hook_xmp2': (0x60455d39, bytes.fromhex('24fd08f168')),   # the same writer after its 2301-byte copy (mov 2301,a0; add d2,a0) -> block +160
          '.hook_wl': (0x604b8d91, bytes.fromhex('f1ecf000fa08e814'))}   # ft8: work-list key -> block +136   # ft4: end of combiner 1's set-up -> block +128   # ft3: the combiner set-up's selector call -> block +120   # ft1: still set-up -> code block +112 (grain texture)   # film test 9: the reset keeps the strip's scroll       # v0.23: Blacks / Whites bars top-down          # v0.23: our row title "Vignette Correction"          # v0.23: the bar's dot step   # v0.21 grain: request configuration -> selector
 XB_SRC = HERE / 'src' / 'xblock.s'
 XB_L1, XB_L2 = 0x10000000, 0x12345670          # the code block is linked at both; fields that move = relocations
@@ -487,7 +488,7 @@ def xmp_include():
         elif k == 'look': lines.append(f' XLOOK {f["name"]}'); mx += pf + 15 + 1
         elif k == 'film': lines.append(f' XFILM {f["name"]}'); mx += pf + 2 + 1
         else:
-            w = max(len(str(v)) for v in range(f['min'], f['max'] + 1))
+            w = max(3, *(len(str(v)) for v in range(f['min'], f['max'] + 1)))     # xb_put_s writes at most "-99" whatever the byte holds
             assert 0 <= f['off'] < 64
             if k == 'num': lines.append(f' XNUM {f["name"]}, {f["off"]}'); mx += pf + w + 1
             elif k == 'list12': lines.append(f' XLIST {f["name"]}, {f["off"]}'); mx += pf + 12 * w + 11 + 1

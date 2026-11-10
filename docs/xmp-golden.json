@@ -23,6 +23,12 @@
    "film": 20,
    "record": "fbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfb01f9f9fbfbfe00fbf9f9f9fb05030103fb0bfb0bfb00000000000000",
    "text": " xmlns:cad=\"https://androidfanman.github.io/caduceus-om3/ns/1/\" cad:Version=\"1\" cad:Look=\"ABCDEFGHIJKLMNO\" cad:Film=\"20\" cad:Hue=\"-5,-5,-5,-5,-5,-5,-5,-5,-5,-5,-5,-5\" cad:Light=\"-5,-5,-5,-5,-5,-5,-5,-5,-5,-5,-5,-5\" cad:Saturation=\"-5,-5,-5,-5,-5,-5,-5,-5,-5,-5,-5,-5\" cad:WbOn=\"1\" cad:WbAB=\"-7\" cad:WbGM=\"-7\" cad:Blacks=\"-5\" cad:Whites=\"-5\" cad:Contrast=\"-2\" cad:Shading=\"-5\" cad:Shadows=\"-7\" cad:Midtones=\"-7\" cad:Highlights=\"-7\" cad:GlowClarity=\"-5\" cad:Art=\"5\" cad:NR=\"3\" cad:VigFix=\"1\" cad:Grain=\"3\" cad:Sharp=\"-5\" cad:ShadowColor=\"11\" cad:ShadowStrength=\"-5\" cad:HighlightColor=\"11\" cad:HighlightStrength=\"-5\""
+  },
+  {
+   "name": "NR High",
+   "film": 2,
+   "record": "000000010000000000000000000000000000fe00000000000000000100000000000000000101ff02ff010000ff0001000004010000060201ff00000000000000",
+   "text": " xmlns:cad=\"https://androidfanman.github.io/caduceus-om3/ns/1/\" cad:Version=\"1\" cad:Look=\"NR High\" cad:Film=\"2\" cad:Hue=\"0,0,0,1,0,0,0,0,0,0,0,0\" cad:Light=\"0,0,0,0,0,0,-2,0,0,0,0,0\" cad:Saturation=\"0,0,0,1,0,0,0,0,0,0,0,0\" cad:WbOn=\"1\" cad:WbAB=\"1\" cad:WbGM=\"-1\" cad:Blacks=\"2\" cad:Whites=\"-1\" cad:Contrast=\"1\" cad:Shading=\"0\" cad:Shadows=\"-1\" cad:Midtones=\"0\" cad:Highlights=\"1\" cad:GlowClarity=\"0\" cad:Art=\"0\" cad:NR=\"4\" cad:VigFix=\"1\" cad:Grain=\"0\" cad:Sharp=\"0\" cad:ShadowColor=\"6\" cad:ShadowStrength=\"2\" cad:HighlightColor=\"1\" cad:HighlightStrength=\"-1\""
   }
  ]
 }

@@ -7720,6 +7720,26 @@ s_xmp:
  movbu d0,(a1)
  jmp xmp_back
 
+/* The same writer after it copied the 2301 bytes (stock 0x60455d39: `mov 2301,a0; add d2,a0`, then `ret [d2],8` at 0x60455d3e):
+ * code block +160 (xb_xmpr) puts the master packet back to the stock tail (the Exif context object holding it is copied for
+ * other metadata, e.g. a RAW's, so this shot's look must not stay in it). Only d2 is live (the output pointer): xb_xmpr keeps it. */
+.section .hook_xmp2,"ax"
+ jmp s_xmp2                       /* stock 0x60455d39: 24 fd 08 f1 68 */
+
+.section .ext11,"ax"
+s_xmp2:
+ add -16,sp
+ call xp,[],0
+ beq 9f
+ add 160,a1
+ mov 0x62a982e6,a0
+ calls (a1)
+9:
+ add 16,sp
+ mov 2301,a0
+ add d2,a0
+ jmp xmp_back2
+
 /* ------------------------------------------------------------------ split toning (v0.26)
  * research/NOTES.md "Split toning": the RGB gamma stage (0x60516ad9) copies the picture-mode curve into the job three
  * times (O+1252 R / +1892 G / +2532 B: 256 x u16 12-bit + 64 x u16 fine table, 640 B each) before the stage list that

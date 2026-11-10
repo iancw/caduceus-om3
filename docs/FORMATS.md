@@ -79,7 +79,7 @@ order (one space before each).
 | `Contrast`, `Shading` | +41, +43 | −2..2, −5..5 |
 | `Shadows`, `Midtones`, `Highlights` | +44..46 | −7..7 |
 | `GlowClarity` | +47 | −5..−1 Glow, 1..5 Clarity, 0 off |
-| `Art`, `NR`, `VigFix`, `Grain`, `Sharp` | +48..52 | as the record: Art 0..5, NR 0..3, VigFix 0..1, Grain 0..3, Sharp −5..2 |
+| `Art`, `NR`, `VigFix`, `Grain`, `Sharp` | +48..52 | as the record: Art 0..5, NR 0..4 (0 Camera, 1 Std, 2 Low, 3 Off, 4 High), VigFix 0..1, Grain 0..3, Sharp −5..2 |
 | `ShadowColor`, `ShadowStrength`, `HighlightColor`, `HighlightStrength` | +53..56 | colour 0..11, strength −5..5 |
 
 Colour order of the three lists (the record's, clockwise from Yellow): Yellow, Orange, Orange-red, Red, Magenta, Violet,
