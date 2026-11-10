@@ -2304,3 +2304,30 @@ Question (owner): can the dial's positions each pick a COLOR / FILM look (e.g. A
 - Not done: reading GetValue(111 / 898..901 / 988) after each flip (the getter stub in session_ed1's `vals` ran away
   on the stock image: X), the firmware handler of EV_CHANGE_PICTURE_MODE_DIAL (where the position becomes the
   picture mode), whether our film switch (`fl_set`) can be called from there, and anything on a real camera.
+
+### Creative Dial: the handler found (2026-11-10; emulator trace + disassembly, stock main block; branch experiment/dial-probe)
+- Event: the dial change is EV 0x1fa = 506 `EV_CHANGE_PICTURE_MODE_DIAL` (name table 0x60df0b80 {name, id}); the GUI states
+  handle it at 0x611ab147, 0x6122b473, 0x6122ce9f and the event router 0x60d929ee. The dial's state enum (printer
+  0x60b6d566): 0 NON, 1 COLOR_CREATOR, 2 ART, 3 COLORTONE, 4 COLOR_CREATOR_2, 5 MONOCHRO_CREATOR; the state is read
+  through the camera-common object (0x60b8696a, method +12, id 569).
+- **The step that matters: function 0x610934ac (shooting-common sub-app; log string "setPictureModeDialPosition...";
+  its only caller is 0x610bf0a7).** At 0x610934e8 it reads the dial state (object method +348) and maps it to a setting
+  id in d2: state 1 -> 900, 2 -> 899, 3 -> 898, 4 -> 901, 5 -> 988, else 65535. At 0x6109354d (`cmp 65535,d2`) it then
+  compares GetValue(897) (0x61085dbb) with d2, and if different (and 0x61090175 says 1) does SetValue(897, d2)
+  (0x61085d05, at 0x6109356f); then 0x6108e874(1) / 0x6108e831 refresh. So **setting 897 = which picture-mode setting
+  (898 / 899 / 900 / 901 COLOR 1-4 / 988 MONO 1-4) the dial selects** (the same 897 the super-control-panel step
+  reads, see "dials through the films").
+- Emulator (X): d2 at 0x6109354d for the five group-5 bits: bit 0 = 988 (MONO), bit 1 = 901 (COLOR), bit 2 = 898 (no
+  effect, GUI -> CA_REQ_DISP), bit 3 = 899 (ART), bit 4 = 900 (Color Creator); 0x6109356b (the SetValue(897)) runs on
+  every flip. `research/emulator/dial_trace.mjs`.
+- **Plan (analysis, not built):** hook 0x6109354d (a 6-byte `cmp`, room for `jmp` + nop): if d2 is 988 / 898 / 899 / 900
+  and the card file maps that position to film j, call SetValue(901, FV0 + j) (the same facade path as the film list;
+  fl_set loads the film) and set d2 = 901, then continue; the rest of the function then treats the position as COLOR.
+  The COLOR position (state 4) keeps its own last COLOR / film (remember it when leaving COLOR). A new card file
+  (e.g. DIAL.BIN: 4 bytes, film or 0 = camera's own) and a Control Panel page would set the mapping.
+- **Risks / open:** (1) other code reads the dial *state* (not 897): the GUI handler 0x6122b47c compares it with 2 (ART),
+  `Shooting::getPicModeDialWarning`, the direct-picture-mode screen choice (the emulator opened the editor for the
+  position's own mode) - the screen shown for a remapped position is untested; (2) the cell / title redraw problem when a
+  step stays on the same COLOR (noted for the SCP dials) may show here too; (3) the capture path may check the dial
+  state for ART / MONO rendering; (4) MONO (988) and ART use other pipelines: a film on them is only as good as the
+  COLOR route allows; (5) camera behaviour with a physical dial is unknown (emulator flips bits, no detent timing).

@@ -136,8 +136,14 @@ rm -f "$OUT/E1479999.BIN"      # keep main.bin and the card files for the emulat
 # an emulator SD card: blank, formatted by the firmware, then this build's OM3MOD card files
 CARD=$WORK/card.omsd
 if [ ! -f "$WORK/card-blank.omsd" ]; then
-  (OM_EMU_MODEL=E147 node "$REPO/research/emulator/session_probe2.mjs" "$EMU/emu" "$OUT/main.bin" blank \
-    "$WORK/card-blank.json" "$WORK/card-blank.omsd" >/dev/null 2>&1) || { echo "could not make the blank card"; exit 1; }
+  # the formatted card is the same whichever firmware formats it. Since v0.26.2 this build does not boot under the
+  # plain scripts (its power-on loader task is unknown to om-emu: see the emulator line below), so the stock main
+  # block formats the card when the build fails
+  for m in "$OUT/main.bin" "$MAIN"; do
+    (OM_EMU_MODEL=E147 node "$REPO/research/emulator/session_probe2.mjs" "$EMU/emu" "$m" blank \
+      "$WORK/card-blank.json" "$WORK/card-blank.omsd" >/dev/null 2>&1) && break || rm -f "$WORK/card-blank.omsd"
+  done
+  [ -f "$WORK/card-blank.omsd" ] || { echo "could not make the blank card"; exit 1; }
 fi
 python3 "$REPO/tools/emulator/card_add_file.py" "$WORK/card-blank.omsd" "$CARD.tmp" "$OUT/GUIDES.BIN" OM3MOD GUIDES.BIN >/dev/null
 python3 "$REPO/tools/emulator/card_add_file.py" "$CARD.tmp" "$CARD" "$OUT/LABELS.BIN" OM3MOD LABELS.BIN >/dev/null
@@ -153,7 +159,10 @@ say "ready"
 cat <<EOF
   . $WORK/env.sh
   build:     python3 \$OM3_REPO/firmware/build.py --stock \$OM3_STOCK --toolchain \$OM3_TOOLCHAIN --out \$OM3_WORK/out-NAME
-  emulator:  node \$OM3_REPO/tools/emulator/session_ed1.mjs \$OM3_EMU \$OM3_WORK/out-check/main.bin \$OM3_CARD out.json saved.omsd 's1 ok ok down shot:a.png'
+  emulator:  OM_WORKER_ENTRY=60a8f623 node \$OM3_REPO/tools/emulator/session_ed1_worker.mjs \$OM3_EMU \$OM3_WORK/out-check/main.bin \$OM3_CARD out.json saved.omsd 's1 ok ok down shot:a.png'
+             (v0.26.2 and later start a loader task om-emu does not know: it stops with "kernel would start firmware
+              task entry 0xNNNNNNNN ... not modelled". OM_WORKER_ENTRY is that address + 0x10021020; 60a8f623 for
+              v0.26.2. Older builds run with session_ed1.mjs and no variable.)
              (a different build: put its GUIDES.BIN on the card with tools/emulator/card_add_file.py)
   disasm:    \$OM3_REPO/research/tools/dis.sh 0x60513d00 0x60513d40
 EOF
