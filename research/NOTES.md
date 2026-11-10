@@ -2282,3 +2282,25 @@ Fork: github.com/fernandezk26/camera-stuff (Apache-2.0), branches `sdload/v0.26.
 - Then (owner: "no shadow at noon ... then shadows vice versa"): the shadow follows the time of day (none at noon,
   growing to 60% of the chart at sunrise / sunset; on the right in the morning, the left in the afternoon, the sun
   being on the arc's side); the slider became an on / off tick. Published.
+
+## Creative Dial (picture-mode dial): what the firmware and emulator show (2026-11-10; branch experiment/dial-probe)
+Question (owner): can the dial's positions each pick a COLOR / FILM look (e.g. ART position -> FILM 3)? Status words below.
+- **Firmware (analysis, strings):** a Picture Mode dial exists separately from the exposure mode dial: key kind
+  `KEY_KIND_PICMODEDIAL`, events `EV_CHANGE_PICTURE_MODE_DIAL` / `OLY_CHANGE_PICTURE_MODE_DIAL`, getter
+  `CameraCommon::getPictureModeDialState` (no setter by that name), GUI state `ID_ST_DIRECT_PICTUREMODE_*`. The state
+  enum (printer at 0x60b6d566, switch on 0..5): 0 NON, 1 COLOR_CREATOR, 2 ART, 3 COLORTONE, 4 COLOR_CREATOR_2,
+  5 MONOCHRO_CREATOR (names at 0x60e4cc17..). Which enum value is which physical position: not read yet.
+- **Emulator (X, E147, stock main block, no patch):** UI_IN group 5 (1 byte, 5 bits, all code 0x1906, switch) is the
+  Creative Dial; group 4 (3 bits, code 0x1909) is another position switch (the emulator's "creative dial 0x1909"
+  comment is about this one; flipping it gives CA_REQ_DISP and no picture-mode screen, so it is something else).
+  Flipping group 5's bits (`set_bit` + `push_group(5)`, then `camapp.pump`) shows, by bit index: 0 = MONO 1 editor
+  ("Color Filter"), 1 = COLOR 1 editor ("Color Vivid", Color All), 2 = plain shooting screen (no effect), 3 = ART
+  picker (Pop Art I), 4 = Color Creator ("Color Vivid", one-dial icon). GUI state after 0/1/3/4:
+  SS_MENU_LV / ID_ST_DIRECT_PICTUREMODE_ART, after 2: SS_COMMON / ID_ST_CA_REQ_DISP. Bit order is the emulator's
+  entry order, not necessarily the order round the body. The emulator's own idle position is bit 1 for group 4 only;
+  group 5 idles at bit 1 too (image 0x02) = the COLOR position.
+- So the dial is drivable in the emulator, and a position change opens the position's own Picture Mode screen. The
+  probe: `research/emulator/dial_probe.mjs`.
+- Not done: reading GetValue(111 / 898..901 / 988) after each flip (the getter stub in session_ed1's `vals` ran away
+  on the stock image: X), the firmware handler of EV_CHANGE_PICTURE_MODE_DIAL (where the position becomes the
+  picture mode), whether our film switch (`fl_set`) can be called from there, and anything on a real camera.
