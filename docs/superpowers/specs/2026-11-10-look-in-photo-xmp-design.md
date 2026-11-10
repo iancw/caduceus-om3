@@ -33,8 +33,8 @@ name) and its numbering is OM's, not ours.
 
 ## The data
 
-In the photo's existing XMP packet (`rdf:Description`), **after the `xmp:Rating` digit** (the stock rating edit only
-searches the first 230 bytes), the camera adds one namespace declaration and these attributes. Values are the same
+In the photo's existing XMP packet (`rdf:Description`), **after the `xmp:Rating` digit** (the stock rating edit compares at
++230 and otherwise searches from the start, so it still finds the Rating before our text), the camera adds one namespace declaration and these attributes. Values are the same
 numbers as one `LOOKS.BIN` record (`docs/FORMATS.md`), the settings **as applied at the shot**, so a film the owner edited
 shows the edited values.
 

@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - The XMP packet stays exactly **2301 bytes**; `<?xpacket end="w"?>` stays last; the APP1 length constants (0x091C, return 2334) are not touched.
-- Fields go **after the `xmp:Rating` digit** (the stock rating edit searches only the first 230 bytes), before `/>`.
+- Fields go **after the `xmp:Rating` digit** (the stock rating edit compares at +230, else searches from the start: it finds Rating before our text), before `/>`.
 - Namespace `xmlns:cad="https://androidfanman.github.io/caduceus-om3/ns/1/"`; `cad:Version="1"`.
 - Values are one `LOOKS.BIN` record (`docs/FORMATS.md`), as applied at the shot; record `+42` (legacy Sharpness) is not written; no COLOR slot field.
 - `Look` is the card's look/film name, up to 15 characters, with `& < > " '` and anything outside 0x20..0x7e replaced by `_`; omitted when no film is selected. `Film` = 5 × (COLOR − 1) + look (1–20), `0` for the slot's own settings.
