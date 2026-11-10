@@ -30,6 +30,7 @@ import { parseLook } from './pack';
 import { base as rollBase, drawGroups, film as rollFilm } from './rollart';
 import { ROLL_ISOS, ROLL_NAME_MAX, ROLL_SWATCHES, cleanRollName, defaultRoll, hexRgb, rollOf, rollTooBig, rollartBin, shelfOf, type Roll } from './rollshelf';
 import { cubeApply, fitLook, lightroomExtras, lightroomTransform, looksLikeLog, parseCube, parseLightroom, type RGB, type Transform } from './convert';
+import { lookFromPhoto } from './xmp';
 // ---------------------------------------------------------------- state
 const LIBRARY = parsePack(libraryJson);
 // The colour-frames test photo first, then public-domain (CC0) photos picked for skin, strong colour, greens, blues,
@@ -229,6 +230,7 @@ function shell() {
         h('button', { onclick: () => om3FilmPicker(), title: 'Add film simulations to your films' }, 'Film sims'),
         h('button', { onclick: () => $<HTMLInputElement>('#grade').click(), title: 'Make a film from your own .cube LUT or Lightroom preset (.xmp, .lrtemplate)' }, 'From LUT / preset…'),
         h('button', { onclick: pasteDialog, title: 'Open a shared look or looks link' }, 'Paste link'),
+        h('button', { onclick: () => $<HTMLInputElement>('#lookphoto').click(), title: 'Read the look a photo from the patched camera was shot with and add it to your looks' }, 'Look from photo'),
         h('button', { onclick: om3Share }, 'Share looks'),
         h('button', { onclick: om3InstallDialog }, 'Install firmware'),
         h('button', { class: 'primary', onclick: om3ExportDialog }, 'Export'))),
@@ -244,7 +246,8 @@ function shell() {
     h('div', { id: 'toast', class: 'toast', role: 'status', 'aria-live': 'polite' }),
     h('input', { type: 'file', id: 'file', multiple: true, accept: '.json,application/json,.bin,.BIN,.jpg,.JPG,.jpeg,image/jpeg,.cube,.CUBE,.xmp,.XMP,.lrtemplate', hidden: true, onchange: om3OnFile }),
     h('input', { type: 'file', id: 'photo', accept: 'image/*', multiple: true, hidden: true, onchange: onPhoto }),
-    h('input', { type: 'file', id: 'grade', accept: '.cube,.CUBE,.xmp,.XMP,.lrtemplate', hidden: true, onchange: om3OnGradeFile }));
+    h('input', { type: 'file', id: 'grade', accept: '.cube,.CUBE,.xmp,.XMP,.lrtemplate', hidden: true, onchange: om3OnGradeFile }),
+    h('input', { type: 'file', id: 'lookphoto', accept: '.jpg,.jpeg,image/jpeg', hidden: true, onchange: om3OnLookPhoto }));
   buildPreview();
   // owner 2026-11-13: the film list is as tall as the preview and scrolls on its own
   const listPane = $<HTMLElement>('#list'), pvPane = $<HTMLElement>('#preview');
@@ -1938,6 +1941,17 @@ function om3OpenCurves(bytes: Uint8Array, name: string) {
   if (!matched) { toast(`${name} was saved for other looks: none of these ${looks} matches it. Open the LOOKS.BIN saved with it first, or both together.`, 'err'); return; }
   save(); renderAll();
   toast(`Curves and colour mix from ${name} on ${matched} of ${looks} looks${matched < looks ? ' (the others were changed since, or come from another set)' : ''}`);
+}
+
+/** A JPG made by the patched camera: its look (docs/FORMATS.md "XMP fields") is added to the looks. Read in the browser only. */
+async function om3OnLookPhoto(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0];
+  (e.target as HTMLInputElement).value = '';
+  if (!f) return;
+  try {
+    const r = lookFromPhoto(new Uint8Array(await f.arrayBuffer()));
+    placeLook({ look: r.look, changed: [], dropped: [] });
+  } catch (err) { toast((err as Error).message, 'err'); }
 }
 
 async function om3OnGradeFile(e: Event) {
