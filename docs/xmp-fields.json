@@ -1,0 +1,180 @@
+{
+ "version": 1,
+ "prefix": "cad",
+ "namespace": "https://androidfanman.github.io/caduceus-om3/ns/1/",
+ "fields": [
+  {
+   "name": "Version",
+   "kind": "version"
+  },
+  {
+   "name": "Look",
+   "kind": "look"
+  },
+  {
+   "name": "Film",
+   "kind": "film"
+  },
+  {
+   "name": "Hue",
+   "kind": "list12",
+   "off": 0,
+   "min": -5,
+   "max": 5
+  },
+  {
+   "name": "Light",
+   "kind": "list12",
+   "off": 12,
+   "min": -5,
+   "max": 5
+  },
+  {
+   "name": "Saturation",
+   "kind": "list12",
+   "off": 24,
+   "min": -5,
+   "max": 5
+  },
+  {
+   "name": "WbOn",
+   "kind": "num",
+   "off": 36,
+   "min": 0,
+   "max": 1
+  },
+  {
+   "name": "WbAB",
+   "kind": "num",
+   "off": 37,
+   "min": -7,
+   "max": 7
+  },
+  {
+   "name": "WbGM",
+   "kind": "num",
+   "off": 38,
+   "min": -7,
+   "max": 7
+  },
+  {
+   "name": "Blacks",
+   "kind": "num",
+   "off": 39,
+   "min": -5,
+   "max": 5
+  },
+  {
+   "name": "Whites",
+   "kind": "num",
+   "off": 40,
+   "min": -5,
+   "max": 5
+  },
+  {
+   "name": "Contrast",
+   "kind": "num",
+   "off": 41,
+   "min": -2,
+   "max": 2
+  },
+  {
+   "name": "Shading",
+   "kind": "num",
+   "off": 43,
+   "min": -5,
+   "max": 5
+  },
+  {
+   "name": "Shadows",
+   "kind": "num",
+   "off": 44,
+   "min": -7,
+   "max": 7
+  },
+  {
+   "name": "Midtones",
+   "kind": "num",
+   "off": 45,
+   "min": -7,
+   "max": 7
+  },
+  {
+   "name": "Highlights",
+   "kind": "num",
+   "off": 46,
+   "min": -7,
+   "max": 7
+  },
+  {
+   "name": "GlowClarity",
+   "kind": "num",
+   "off": 47,
+   "min": -5,
+   "max": 5
+  },
+  {
+   "name": "Art",
+   "kind": "num",
+   "off": 48,
+   "min": 0,
+   "max": 5
+  },
+  {
+   "name": "NR",
+   "kind": "num",
+   "off": 49,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "VigFix",
+   "kind": "num",
+   "off": 50,
+   "min": 0,
+   "max": 1
+  },
+  {
+   "name": "Grain",
+   "kind": "num",
+   "off": 51,
+   "min": 0,
+   "max": 3
+  },
+  {
+   "name": "Sharp",
+   "kind": "num",
+   "off": 52,
+   "min": -5,
+   "max": 2
+  },
+  {
+   "name": "ShadowColor",
+   "kind": "num",
+   "off": 53,
+   "min": 0,
+   "max": 11
+  },
+  {
+   "name": "ShadowStrength",
+   "kind": "num",
+   "off": 54,
+   "min": -5,
+   "max": 5
+  },
+  {
+   "name": "HighlightColor",
+   "kind": "num",
+   "off": 55,
+   "min": 0,
+   "max": 11
+  },
+  {
+   "name": "HighlightStrength",
+   "kind": "num",
+   "off": 56,
+   "min": -5,
+   "max": 5
+  }
+ ]
+}

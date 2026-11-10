@@ -1,0 +1,22 @@
+{
+ "cases": [
+  {
+   "name": "Portra 400",
+   "film": 1,
+   "record": "000000010000000000000000000000000000fe00000000000000000100000000000000000101ff02ff010000ff0001000000010000060201ff00000000000000",
+   "text": " xmlns:cad=\"https://androidfanman.github.io/caduceus-om3/ns/1/\" cad:Version=\"1\" cad:Look=\"Portra 400\" cad:Film=\"1\" cad:Hue=\"0,0,0,1,0,0,0,0,0,0,0,0\" cad:Light=\"0,0,0,0,0,0,-2,0,0,0,0,0\" cad:Saturation=\"0,0,0,1,0,0,0,0,0,0,0,0\" cad:WbOn=\"1\" cad:WbAB=\"1\" cad:WbGM=\"-1\" cad:Blacks=\"2\" cad:Whites=\"-1\" cad:Contrast=\"1\" cad:Shading=\"0\" cad:Shadows=\"-1\" cad:Midtones=\"0\" cad:Highlights=\"1\" cad:GlowClarity=\"0\" cad:Art=\"0\" cad:NR=\"0\" cad:VigFix=\"1\" cad:Grain=\"0\" cad:Sharp=\"0\" cad:ShadowColor=\"6\" cad:ShadowStrength=\"2\" cad:HighlightColor=\"1\" cad:HighlightStrength=\"-1\""
+  },
+  {
+   "name": "",
+   "film": 0,
+   "record": "000000010000000000000000000000000000fe00000000000000000100000000000000000101ff02ff010000ff0001000000010000060201ff00000000000000",
+   "text": " xmlns:cad=\"https://androidfanman.github.io/caduceus-om3/ns/1/\" cad:Version=\"1\" cad:Film=\"0\" cad:Hue=\"0,0,0,1,0,0,0,0,0,0,0,0\" cad:Light=\"0,0,0,0,0,0,-2,0,0,0,0,0\" cad:Saturation=\"0,0,0,1,0,0,0,0,0,0,0,0\" cad:WbOn=\"1\" cad:WbAB=\"1\" cad:WbGM=\"-1\" cad:Blacks=\"2\" cad:Whites=\"-1\" cad:Contrast=\"1\" cad:Shading=\"0\" cad:Shadows=\"-1\" cad:Midtones=\"0\" cad:Highlights=\"1\" cad:GlowClarity=\"0\" cad:Art=\"0\" cad:NR=\"0\" cad:VigFix=\"1\" cad:Grain=\"0\" cad:Sharp=\"0\" cad:ShadowColor=\"6\" cad:ShadowStrength=\"2\" cad:HighlightColor=\"1\" cad:HighlightStrength=\"-1\""
+  },
+  {
+   "name": "A&B<\"x'é",
+   "film": 2,
+   "record": "000000010000000000000000000000000000fe00000000000000000100000000000000000101ff02ff010000ff0001000000010000060201ff00000000000000",
+   "text": " xmlns:cad=\"https://androidfanman.github.io/caduceus-om3/ns/1/\" cad:Version=\"1\" cad:Look=\"A_B__x__\" cad:Film=\"2\" cad:Hue=\"0,0,0,1,0,0,0,0,0,0,0,0\" cad:Light=\"0,0,0,0,0,0,-2,0,0,0,0,0\" cad:Saturation=\"0,0,0,1,0,0,0,0,0,0,0,0\" cad:WbOn=\"1\" cad:WbAB=\"1\" cad:WbGM=\"-1\" cad:Blacks=\"2\" cad:Whites=\"-1\" cad:Contrast=\"1\" cad:Shading=\"0\" cad:Shadows=\"-1\" cad:Midtones=\"0\" cad:Highlights=\"1\" cad:GlowClarity=\"0\" cad:Art=\"0\" cad:NR=\"0\" cad:VigFix=\"1\" cad:Grain=\"0\" cad:Sharp=\"0\" cad:ShadowColor=\"6\" cad:ShadowStrength=\"2\" cad:HighlightColor=\"1\" cad:HighlightStrength=\"-1\""
+  }
+ ]
+}
