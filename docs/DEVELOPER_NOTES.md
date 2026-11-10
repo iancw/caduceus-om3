@@ -517,3 +517,11 @@ Includes the v0.23 Picture Mode rows (never released alone). Full trail: `resear
 - **Effects:** XB_FX 0 in xblock.s: Glow / Clarity and Art Effect read 0 where they act. Grain: camera route (key 12)
   unless the COLOR's Shading (setting 912 + k) is not 0, then the CPU route (Shading + key 12 = monochrome, owner test).
 - Space: ext11 (proven 64 KiB) ~60.9 KB used; GUIDES.BIN 14200 B of the 16448 B malloc cap.
+
+## The look in the photo (branch feature/look-in-photo-xmp; build xmp4, emulator-tested 2026-11-10, camera test pending)
+
+- Hook `.hook_xmp` 0x60455cfa -> `s_xmp` (ext11) -> code block +152 `xb_xmp` / `xb_xfmt` (xblock.s): rewrites the JPEG's XMP packet tail with `cad:` fields.
+  Field list and ranges: `docs/xmp-fields.json` (generated into `xmp_tab.inc` by `build.py`, which also asserts the text fits and GUIDES.BIN <= 16448 B).
+- Control Panel: `webapp/src/xmp.ts` (`cadText`, `findXmp`, `readCad`, `lookFromPhoto`), button "Look from photo"; `lookFromRecord` split out of `readProfiles`.
+- Tests: `webapp/tests/xmp.test.ts`; emulator: `tools/emulator/cbuild.sh NAME`, `XMP_HOOK=1 XMP_SCEN=1 tools/emulator/xmp_fmt_check.sh NAME`.
+- Details, limits and the camera-only risks: `research/NOTES.md`.

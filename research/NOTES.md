@@ -2547,7 +2547,8 @@ Runtime address = decoded-file address - 0x50000000 + 0x60021020 (`research/tool
   0x60455d47 (the "XMP Update" one): one edits a packet read back into a heap buffer (scheap_alloc, read 0x604537b0, write
   0x604537e5), the other edits the RAM packet kept in the context (a2+92). So it is the playback / later rating change; a
   fresh shot keeps the power-on `xmp:Rating="0"`. Consequence for a hook on the JPEG writer: our added attribute must stay
-  **after** the Rating digit (and the Rating search window is the first 230 bytes), and a later in-camera rating edit
+  **after** the Rating digit (correction 2026-11-10: the helper compares at packet+230 first, then searches the packet from the start with a
+  quadratic strstr; it is not limited to the first 230 bytes, and the Rating text sits at about +230), and a later in-camera rating edit
   on the file only touches that one digit, so our fields survive it.
 - **Padding helpers** 0x6045812d (copy a string into a field, space-padded) and 0x60458165 (same, from a heap string) are the
   builder's way of filling fixed-width fields; the builder is long (many fixed fields), so the Exif block is also
@@ -2591,3 +2592,28 @@ Runtime address = decoded-file address - 0x50000000 + 0x60021020 (`research/tool
 - **Consequence:** the hook cannot be tested end to end in the emulator. What can be: our own formatter (it calls no ROM
   helper) on a hand-made stock-shaped packet, and the hook stub up to the point where it hands back to the stock writer.
   The real hook behaviour is camera-only.
+
+
+### The look in the photo: built and emulator-tested (2026-11-10, branch `feature/look-in-photo-xmp`; emulator only, NOT camera-tested)
+Design: `docs/superpowers/specs/2026-11-10-look-in-photo-xmp-design.md`; fields: `docs/FORMATS.md` "XMP fields (v1)", `docs/xmp-fields.json`
+(single source of truth), `docs/xmp-golden.json` (exact expected text). Plan and ledger rulings: `docs/superpowers/plans/`.
+- **What it does:** a hook at the stock JPEG XMP writer's entry (0x60455cfa; the two displaced instructions `mov 255,d0; movbu d0,(a1)`
+  run in the stub, back at 0x60455cff) calls code block entry +152 (`xb_xmp`, xblock.s) once per JPEG. It reads the effective COLOR (getter 63153),
+  captures the settings with the editor's `pf_capto` into a scratch record, finds the film (P+LIDX+k = look 1..5; name from the loaded
+  LOOKS.BIN at +1312) and rewrites the RAM packet (0x62a982e6) from the Rating's closing quote to the end marker: ` xmlns:cad=...` +
+  26 attributes + the stock tail + spaces. Length 2301 and the end marker stay. Worst-case text 614 bytes (extreme golden case).
+  No COLOR 1-4: the packet is left alone unless an earlier shot's fields are in it (then the stock tail is restored). Unbuilt packet: nothing.
+- **Sizes:** GUIDES.BIN 13248 -> 15168 B (cap 16448; the block grew 1.9 KB because the fields are straight-line generated code); ext11 65440 of 65536 (stub 48 B).
+- **Emulator evidence** (`tools/emulator/cbuild.sh`, `xmp_fmt_check.sh`, `xmp_check.mjs`): formatter 8/8 cases byte-equal to the golden text (+ no-look untouched,
+  fields gone after a look, unbuilt packet untouched, second look replaces first); the hook entered as the stock caller does, run to 0x60455cff: registers
+  and sp as at entry, `FF` written, fields present, 2301 B, end marker last; scenarios: film 3 with the bank's name, own settings (Film 0, no Look), awkward
+  name -> `A_B__x__`, film over film, hook on an already-rated packet, and the **stock rating edit (0x604580c2) run on our rewritten packet** (Rating becomes 3,
+  fields intact); the firmware-written packet is read back by the Control Panel's `readCad` / `lookFromPhoto` (24/24 tests with `XMP_EMU_JSON`).
+  The editor session (`s1 ok ok down down`) is identical to the baseline build.
+- **NOT shown (camera only):** the real packet builder and the stock writer never run in the emulator (ROM helper 0x50002909 missing), so that the real
+  buffer holds a built stock packet at shot time, that the writer copies our text, that the camera does not stall or reboot while `xb_xmp` reads settings
+  during the JPEG write (**risk:** v0.24 rebooted when the capture hook called the settings getter AGET at capture; the getter is called here too, after
+  the capture), what exiftool, Lightroom etc. do with the fields, and whether the ORF (tag 700) carries the same packet.
+- **Camera test (owner):** shoot a film, COLOR's own settings and a non-COLOR mode (JPEG), plus one RAW+JPEG; send the JPGs (and the ORF); read with
+  `exiftool -config docs/caduceus-xmp.config -XMP-cad:all`. Package: `E1479999.BIN` (in `DCOLYMP/`) + its paired `GUIDES.BIN` (in `OM3MOD/`):
+  build `xmp4` = rebuilt identically from the committed tree (E1479999.BIN 99f01d1a..., GUIDES.BIN 8cd6049e...).
