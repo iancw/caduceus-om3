@@ -128,14 +128,88 @@ if (process.env.XMP_FMT_DIR) {
   }
 }
 
+// ---- XMP_HOOK=1 (with XMP_FMT_DIR, token 's1'): the hook at the stock writer's entry 0x60455cfa. A stock-shaped packet is put in
+// the RAM buffer, the writer is entered the way its caller does and run until our stub hands back at 0x60455cff (the
+// stock code after the two displaced instructions; running on would reach the ROM helpers the emulator lacks). Checks:
+// the hook was taken (cad: fields in the packet, 2301 bytes, end marker last), a1 / d2 / sp are as at entry, and the
+// displaced `movbu 255,(a1)` ran. Which COLOR is effective is the emulator's: `effective` reports what the look was.
+let hook = null, scen = null;
+if (process.env.XMP_HOOK && fmt) {
+  const dd = Debugger.attach(lab.sim, {}), BACK = 0x60455cff, XSTATE = 0x62b4dd16, XPOOL = 0xa2852000;
+  const head = '<?xpacket begin="\u00ef\u00bb\u00bf" id="W5M0MpCehiHzreSzNTczkc9d"?>\n<x:xmpmeta xmlns:x="adobe:ns:meta/">\n <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n  <rdf:Description rdf:about=""\n   xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmp:Rating="0"';
+  const tail = '/>\n </rdf:RDF>\n</x:xmpmeta>\n', end = '<?xpacket end="w"?>';
+  const stockPkt = () => { const pk = Buffer.alloc(PACKET_LEN, 0x20); Buffer.from(head + tail, 'latin1').copy(pk); Buffer.from(end, 'latin1').copy(pk, PACKET_LEN - end.length); return pk; };
+  const view = () => { const got = Buffer.from(rd(PACKET, PACKET_LEN)), s = got.toString('latin1'), i = s.indexOf('xmp:Rating="') + 14, j = s.indexOf('/>', i); return { got, s, fields: s.slice(i, j) }; };
+  /** Enter the stock writer as its caller does, with `pkt` in the RAM buffer, until our stub hands back at 0x60455cff. */
+  const runHook = (pkt = stockPkt()) => {
+    const saved = dd.m.getRegs().slice(), sp = ((saved[8] - 0x800) & ~3) >>> 0, stub = (sp - 0x100) >>> 0, B = ((sp - 0x6000) & ~0xff) >>> 0, rel = (WRITER - stub) | 0;
+    dd.write(PACKET, pkt); dd.write(B, new Uint8Array(64).fill(0xee));
+    dd.write(stub, Uint8Array.from([0xdd, rel & 255, rel >> 8 & 255, rel >> 16 & 255, rel >>> 24 & 255, 0x80, 0x08, 0xcb, 0xcb]));
+    const r = saved.slice(); r[9] = stub; r[8] = sp; r[2] = 0x22222222; r[5] = B; r[4] = 0x44444444; r[1] = 0x11111111; dd.m.setRegs(r);
+    let n = 0, entrySp = null; while ((dd.m.getRegs()[9] >>> 0) !== BACK && n < 3000000) { if (entrySp === null && (dd.m.getRegs()[9] >>> 0) === WRITER) entrySp = dd.m.getRegs()[8] >>> 0; dd.m.step(); n++; }
+    const g = dd.m.getRegs(), out = { reached: (g[9] >>> 0) === BACK, steps: n, a1_kept: (g[5] >>> 0) === B, d2_kept: (g[2] >>> 0) === 0x22222222, d1_kept: (g[1] >>> 0) === 0x11111111, sp_kept: entrySp !== null && (g[8] >>> 0) === entrySp, first_byte: rd(B, 1)[0], ...view() };
+    dd.m.setRegs(saved); return out;
+  };
+  const common = (h) => h.reached && h.a1_kept && h.d2_kept && h.d1_kept && h.sp_kept && h.first_byte === 255 && h.got.length === PACKET_LEN && h.s.endsWith('<?xpacket end="w"?>') && h.s.indexOf('\0') < 0;
+  const h0 = runHook();
+  hook = { reached: h0.reached, steps: h0.steps, a1_kept: h0.a1_kept, d2_kept: h0.d2_kept, d1_kept: h0.d1_kept, sp_kept: h0.sp_kept, first_byte: h0.first_byte, fields: h0.fields.length, has_version: h0.s.includes('cad:Version="1"'), packet_len: h0.got.length, end_ok: h0.s.endsWith('<?xpacket end="w"?>'), no_nul: h0.s.indexOf('\0') < 0, effective: h0.fields.slice(0, 400) };
+  hook.ok = common(h0) && hook.has_version;
+  if (process.env.XMP_SCEN) {
+    // The look the emulator's COLOR 1 holds is neutral; the state the editor keeps is poked (as the camera's editor would have it).
+    const P = XPOOL + (rd(XSTATE, 2)[0] | rd(XSTATE, 2)[1] << 8) - 1, rd32 = (a) => { const b = rd(a, 4); return (b[0] | b[1] << 8 | b[2] << 16 | b[3] << 24) >>> 0; };
+    const LPTR = rd32(P + 708), nameAt = (r) => LPTR + 1312 + 16 * r, setName = (r, bytes) => dd.write(nameAt(r), Uint8Array.from([...bytes, ...new Array(16 - bytes.length).fill(0)]));
+    const oldLidx = rd(P + 712, 1)[0], oldName = [...rd(nameAt(2), 16)], oldName3 = [...rd(nameAt(4), 16)];
+    const ascii = (s) => [...Buffer.from(s, 'latin1')];
+    scen = { P: P.toString(16), lptr: LPTR.toString(16), cases: [] };
+    const add = (name, ok, extra = {}) => scen.cases.push({ name, ok, ...extra });
+    // (a) a film is selected on COLOR 1: look 3 = FILM 3 with the card's name
+    dd.write(P + 712, Uint8Array.from([3])); setName(2, ascii('Portra 400'));
+    const a = runHook();
+    scen.packet_a = a.s;   // the packet as the firmware wrote it (webapp/tests/xmp.test.ts reads it with readCad when XMP_EMU_JSON points at this file)
+    add('film selected: Film="3", Look from the bank', common(a) && a.fields.includes(' cad:Look="Portra 400" cad:Film="3" cad:Hue="'), { fields_head: a.fields.slice(0, 200) });
+    // (e) the stock rating edit (0x604580c2, `call ..,[d2,d3,a2,a3],24`) on our packet: the digit changes, our fields stay, length stays
+    { const after = rd(PACKET + PACKET_LEN, 1)[0]; dd.write(PACKET + PACKET_LEN, Uint8Array.from([0]));   // the stock edit searches a C string: end it (our own writes never touch beyond the end marker)
+      const saved = dd.m.getRegs().slice(), sp = ((saved[8] - 0x800) & ~3) >>> 0, stub = (sp - 0x100) >>> 0, rel = (0x604580c2 - stub) | 0;
+      dd.write(stub, Uint8Array.from([0xdd, rel & 255, rel >> 8 & 255, rel >> 16 & 255, rel >>> 24 & 255, 0xf0, 0x18, 0xcb, 0xcb]));
+      const r = saved.slice(); r[9] = stub; r[8] = sp; r[0] = 3; r[4] = PACKET; dd.m.setRegs(r);
+      let n = 0; while ((dd.m.getRegs()[9] >>> 0) !== stub + 7 && n < 120000000) { dd.m.step(); n++; }   // the stock edit searches with a quadratic strstr when the rating is not at +230 (the real packet has it there; this one near it)
+      const d0 = dd.m.getRegs()[0] >>> 0, done = (dd.m.getRegs()[9] >>> 0) === stub + 7, stopPc = (dd.m.getRegs()[9] >>> 0).toString(16), trap = done ? undefined : dd.step(1).stderr, a0 = (dd.m.getRegs()[4] >>> 0).toString(16); dd.m.setRegs(saved);
+      dd.write(PACKET + PACKET_LEN, Uint8Array.from([after]));
+      const v = view();
+      add('stock rating edit after our fields: Rating 3, fields intact', done && d0 === 0 && v.s.includes('xmp:Rating="3"') && v.fields === a.fields && v.got.length === PACKET_LEN && v.s.endsWith('<?xpacket end="w"?>'), { d0, done, stopPc, trap, a0 });
+      // and our hook on a packet whose rating is already 3 leaves the 3
+      const rp = Buffer.from(v.got); const again = runHook(rp);
+      add('hook on a rated packet keeps the rating and rewrites the fields', common(again) && again.s.includes('xmp:Rating="3"') && again.fields === a.fields);
+    }
+    // (c) a name with characters XML does not allow
+    setName(2, [...ascii('A&B<"x\''), 0xe9]);
+    const c = runHook();
+    add('awkward name: Look="A_B__x__", valid text', common(c) && c.fields.includes(' cad:Look="A_B__x__" ') && !/[<>&]/.test(c.fields.replace(/ xmlns:cad="[^"]*"/, '').replace(/cad:\w+="[^"]*"/g, '')), { fields_head: c.fields.slice(0, 160) });
+    // (b) no film: COLOR 1's own settings: Film 0 and no Look
+    dd.write(P + 712, Uint8Array.from([0]));
+    const b0 = runHook();
+    add('own settings: Film="0", no Look', common(b0) && b0.fields.includes(' cad:Film="0" ') && !b0.fields.includes('cad:Look='));
+    // (d) a second film (look 5 on COLOR 1 = FILM 5) after a first: nothing of the first is left
+    dd.write(P + 712, Uint8Array.from([5])); setName(4, ascii('Film Five'));
+    const d5 = runHook(Buffer.from(a.got));
+    add('film 5 over a packet that held film 3', common(d5) && d5.fields.includes('cad:Film="5"') && !d5.fields.includes('Portra 400') && !d5.fields.includes('cad:Film="3"'));
+    // restore the poked state
+    dd.write(P + 712, Uint8Array.from([oldLidx])); dd.write(nameAt(2), Uint8Array.from(oldName)); dd.write(nameAt(4), Uint8Array.from(oldName3));
+    scen.ok = scen.cases.every((x) => x.ok);
+  }
+}
+
 const writer = callWriter();
 const res = {
   image: IMAGE, tokens: SCRIPT, packet_len: packet.length,
   starts_ok: text.startsWith('<?xpacket begin='), ends_ok: text.endsWith('<?xpacket end="w"?>'),
   rating_digit_offset: text.indexOf('xmp:Rating="') + 12, rating: text[text.indexOf('xmp:Rating="') + 12],
-  cad_present: text.includes('cad:Version="'), exec_hits: hits, writer, fmt, packet_hex: hex(packet),
+  cad_present: text.includes('cad:Version="'), exec_hits: hits, writer, fmt, hook, scen, packet_hex: hex(packet),
 };
 fs.writeFileSync(OUT, JSON.stringify(res, null, 1));
 console.log(JSON.stringify({ ...res, packet_hex: undefined }));
 if (fmt && !fmt.ok) { console.error('FORMATTER CHECK FAILED'); process.exit(1); }
 if (fmt) console.log('FORMATTER CHECK PASSED:', fmt.cases.length, 'cases');
+if (hook && !hook.ok) { console.error('HOOK CHECK FAILED', JSON.stringify(hook)); process.exit(1); }
+if (hook) console.log('HOOK CHECK PASSED');
+if (scen) { for (const c of scen.cases) console.log(c.ok ? '  ok  ' : '  FAIL', c.name); if (!scen.ok) { console.error('SCENARIOS FAILED'); process.exit(1); } console.log('SCENARIOS PASSED:', scen.cases.length); }

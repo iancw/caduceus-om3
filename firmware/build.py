@@ -96,6 +96,7 @@ HOOKS = {'.hook_color': (0x60518615, bytes.fromhex('cd6cfdf060')),
          '.hook_bgb': (0x611cb433, bytes.fromhex('ddbc24f3fff01c')),   # the same in grid builder 0x611cb359
          '.hook_bgc': (0x611e44d7, bytes.fromhex('dd1894f1fff01c')),   # the same in grid builder 0x611e4221
          '.hook_bgd': (0x611eae1e, bytes.fromhex('ddd12af1fff01c')),   # the same in grid builder 0x611eab68
+         '.hook_xmp': (0x60455cfa, bytes.fromhex('2cff00f051')),   # the look in the photo: the JPEG XMP writer's entry (mov 255,d0; movbu d0,(a1)) -> block +160
          '.hook_blk': (0x611c7922, bytes.fromhex('4c2144a7d4')),
          '.hook_fv': (0x6120b698, bytes.fromhex('5c14f1dcf050'))}   # border preview: the line lookup's loop end (inc d3; add 68,a1; cmp d1,d3; lcs)   # better grain g1: the grain tile's load -> tg_fill   # ft8: work-list key -> block +136   # ft4: end of combiner 1's set-up -> block +128   # ft3: the combiner set-up's selector call -> block +120   # ft1: still set-up -> code block +112 (grain texture)   # film test 9: the reset keeps the strip's scroll       # v0.23: Blacks / Whites bars top-down          # v0.23: our row title "Vignette Correction"          # v0.23: the bar's dot step   # v0.21 grain: request configuration -> selector
 XB_SRC = HERE / 'src' / 'xblock.s'

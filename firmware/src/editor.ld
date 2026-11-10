@@ -25,6 +25,8 @@ SECTIONS {
   .hook_trl     0x604cf1a4 : { *(.hook_trl) }
   .hook_dp1     0x6054fffd : { *(.hook_dp1) }     /* #91: the per-photo Detail / Drive Priority choice (development parameters +323) */
   .hook_dp2     0x60558041 : { *(.hook_dp2) }     /* #91: the same choice for capture+7482 */
+
+  .hook_xmp     0x60455cfa : { *(.hook_xmp) }
   .hook_tone    0x605197d7 : { *(.hook_tone) }
   .hook_fx      0x60555e50 : { *(.hook_fx) }
   .hook_lv      0x6046b8bb : { *(.hook_lv) }
@@ -112,6 +114,7 @@ pgm_back      = 0x611c3710;
 rsp_back      = 0x611c3cbd;
 sf_stock      = 0x604be2aa;
 wl_back       = 0x604b8d99;         /* ft8: after the work-list key read */
+xmp_back      = 0x60455cff;         /* the look in the photo: after the writer's two displaced entry instructions */
 su_stock      = 0x604b97db;
 prop_set      = 0x610cd5c4;
 wb_shift      = 0x611d2941;
