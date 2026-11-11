@@ -865,7 +865,9 @@ Includes the v0.23 Picture Mode rows (never released alone). Full trail: `resear
 - Known, cosmetic (crombach on #99): on a film with a WB shift the WB menu stars every WB mode, because the film's
   one shift applies on all of them.
 
-## The look in the photo (branch feature/look-in-photo-xmp; build xmp4, emulator-tested 2026-11-10, camera test pending)
+## The look in the photo
+
+## The look in the photo
 
 - Hook `.hook_xmp` 0x60455cfa -> `s_xmp` (ext11) -> code block +152 `xb_xmp` / `xb_xfmt` (xblock.s): rewrites the JPEG's XMP packet tail with `cad:` fields.
   Field list and ranges: `docs/xmp-fields.json` (generated into `xmp_tab.inc` by `build.py`, which also asserts the text fits and GUIDES.BIN <= 16448 B).

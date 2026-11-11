@@ -1,6 +1,6 @@
 # Writing the look into the photo (XMP) — design
 
-Status: **draft for the owner's approval (2026-11-10). Nothing is built.** Evidence labels: *analysis* = read from the
+Evidence labels: *analysis* = read from the
 stock firmware or our source, not run; *camera-tested* = seen on a real OM-3. Everything about the firmware below is
 *analysis* until a camera test. Findings and addresses: `research/NOTES.md`, "Writing the look into the picture's
 metadata" and the three sections after it.
