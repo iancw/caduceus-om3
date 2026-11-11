@@ -2876,7 +2876,7 @@ xt_tab:                           /* Extras slices 1..10 clockwise from 12 o'clo
  .byte 0,0,0                      /* 4 */
  .byte 0,0,0                      /* 5 */
  .byte 0,0,0                      /* 6 */
- .byte 50,0,5                     /* 7 (6 o'clock) Art Effect: 0 Off, 1 Star Light, 2 Pin Hole, 3 -, 4 White Edge, 5 Frame */
+ .byte 0,0,0                      /* 7 (6 o'clock) was Art Effect: slot +50 is now the Creative Dial (dial probe) */ /* was: Art Effect: 0 Off, 1 Star Light, 2 Pin Hole, 3 -, 4 White Edge, 5 Frame */
  .byte 0,0,0                      /* 8 */
  .byte 0,0,0                      /* 9 */
  .byte 0,0,0                      /* 10 */
@@ -3042,7 +3042,7 @@ pm_list:                          /* item ids, in the order the owner reads them
                                    * the colour wheel), tone (Contrast, Highlight & Shadow, Blacks, Whites), white balance
                                    * (A-B, G-M), detail (Sharpness, Noise Filter = NR), lens (Vignette Correction =
                                    * VigFix, Shading), finish (Film Grain Effect = Grain) */
- .long 111, 5397, 8, 5398, BK_IT, WH_IT, AB_IT, 7, NR_IT, VF_IT, 5399, GL_IT, 5400   /* v0.25: Shading back,
+ .long 111, 5397, 8, 5398, BK_IT, WH_IT, AB_IT, 7, NR_IT, VF_IT, 5399, GL_IT, 5400, FR_IT   /* dial probe: FR_IT = Creative Dial; v0.25: Shading back,
                                     Glow / Clarity and Frame rows; AB_IT = the WB grid (no G-M row) */
 .set PM_N, (. - pm_list) / 4
 
@@ -3176,7 +3176,7 @@ it_tab:                           /* the stock 17 item entries (filled by build.
  .long AB_IT, ab_title, wb_l0, 1, 0, wb_l1, 1, 0, wb_l2, 1      /* v0.25 WB grid row: one option (as test 12) */
  .long GM_IT, 0, 0, 0, gm_title, 0, 8 << 16, 0, 0, 0
  .long GL_IT, 0, 0, 0, gl_title, 0, 9 << 16, 0, 0, 0           /* v0.25: icon 9 = IC_GL */
- .long FR_IT, fr_title, fr_l0, 2, 0, fr_l1, 2, 0, fr_l2, 2      /* v0.25: as Vignette Correction */
+ .long FR_IT, fr_title, fr_l0, 5, 0, fr_l1, 5, 0, fr_l2, 5      /* v0.25: as Vignette Correction */
 bk_title:
  .short 4, ST_BKS
  .long 0x6154b480
@@ -3234,15 +3234,24 @@ vf_l1:                            /* the left column: "Vignette" over Off / On *
 vf_l2:                            /* the strip: the camera's Off / On icons */
  OPT 0, 3, VF_I0
  OPT 1, 3, VF_I1
-fr_l0:                            /* v0.25 Frame: the title stays "Frame" */
+fr_l0:                            /* dial probe: the title stays "Creative Dial" */
  OPT 0, 4, ST_FRM
  OPT 1, 4, ST_FRM
-fr_l1:                            /* the left column: "Frame" over Off / On */
- OPT 0, 3, IC_F0
- OPT 1, 3, IC_F1
-fr_l2:                            /* the strip: the camera's Off / On icons */
- OPT 0, 3, VF_I0
- OPT 1, 3, VF_I1
+ OPT 2, 4, ST_FRM
+ OPT 3, 4, ST_FRM
+ OPT 4, 4, ST_FRM
+fr_l1:                            /* the left column: the value's word in the camera's font (type 4) */
+ OPT 0, 4, ST_FRM + 1
+ OPT 1, 4, ST_FRM + 2
+ OPT 2, 4, ST_FRM + 3
+ OPT 3, 4, ST_FRM + 4
+ OPT 4, 4, ST_FRM + 5
+fr_l2:                            /* the strip: the same words */
+ OPT 0, 4, ST_FRM + 1
+ OPT 1, 4, ST_FRM + 2
+ OPT 2, 4, ST_FRM + 3
+ OPT 3, 4, ST_FRM + 4
+ OPT 4, 4, ST_FRM + 5
 wb_l0:                            /* v0.25 WB grid row: the title "WB" */
  OPT 0, 4, ST_AB
 wb_l1:                            /* the left column: the WB± picture over the values (wb_draw) */
@@ -3350,9 +3359,14 @@ st_get:
  mov glc_str,a0
  ret [d2],8
 7:
- cmp ST_FRM,d0
- bne 2f
- mov frm_str,a0
+ mov d0,d1                        /* dial probe: ST_FRM = "Creative Dial", +1..+5 = Off / MONO / Plain / ART / CC */
+ add -ST_FRM,d1
+ cmp 6,d1
+ bcc 2f
+ asl2 d1
+ mov dm_strs,a0
+ add d1,a0
+ mov (a0),a0
  ret [d2],8
 2:
  cmp ST_F0,d0                     /* v0.24: film names */
@@ -3390,8 +3404,21 @@ gms_str:                          /* "G-M" */
  .short 71, 45, 77, 0
 glc_str:                          /* "Glow" (v0.25 owner: + Glow, - Clarity; the row is named for its + side) */
  .short 71, 108, 111, 119, 0
-frm_str:                          /* "Frame" */
- .short 70, 114, 97, 109, 101, 0
+frm_str:                          /* "Creative Dial" */
+ .short 67, 114, 101, 97, 116, 105, 118, 101, 32, 68, 105, 97, 108, 0
+dm_s1:
+ .short 79, 102, 102, 0           /* Off */
+dm_s2:
+ .short 77, 79, 78, 79, 0         /* MONO */
+dm_s3:
+ .short 80, 108, 97, 105, 110, 0  /* Plain */
+dm_s4:
+ .short 65, 82, 84, 0             /* ART */
+dm_s5:
+ .short 67, 67, 0                 /* CC */
+ .balign 4
+dm_strs:
+ .long frm_str, dm_s1, dm_s2, dm_s3, dm_s4, dm_s5
  .balign 16
 std_str:                          /* "Std" */
  .short 83, 116, 100, 0
@@ -3618,13 +3645,10 @@ sl_slot:
 83:
  cmp 10,d1
  bne 84f
- movbu (50,a0),d0                 /* v0.25 Frame: Art Effect 5 -> 1 On, anything else 0 Off */
- cmp 5,d0
- beq 85f
+ movbu (50,a0),d0                 /* dial probe: Creative Dial 0 Off, 1 MONO, 2 Plain, 3 ART, 4 CC (the old Art Effect byte, unused) */
+ cmp 4,d0
+ bls 99f
  clr d0
- bra 99f
-85:
- mov 1,d0
  bra 99f
 84:
  cmp 7,d1
@@ -3828,7 +3852,7 @@ sl_cnt:
  mov 11,d0                        /* v0.25: 9 Glow / Clarity -5..+5 */
  cmp 9,a3
  beq 6f
- mov 2,d0                         /* 10 Frame Off / On */
+ mov 5,d0                         /* 10 Creative Dial (dial probe) */
  cmp 10,a3
  beq 6f
  mov 15,d0                        /* 7 A-B, 8 G-M: -7..+7 */
@@ -3863,7 +3887,7 @@ sl_cnt:
  cmp 9,a3
  beq 99f
  clr d0
- mov 2,d1
+ mov 5,d1
  cmp 10,a3
  beq 99f
  mov -7,d0
@@ -4011,17 +4035,12 @@ sl_set0:
 12:
  cmp 10,a3
  bne 13f
- cmp 0,d1                         /* v0.25 Frame 0 Off / 1 On -> +50 = 0 / 5 */
+ cmp 0,d1                         /* dial probe: Creative Dial 0..4 -> +50 */
  blt 7f
- cmp 1,d1
+ cmp 4,d1
  bgt 7f
- clr d3
- cmp 0,d1
- beq 14f
- mov 5,d3
-14:
  mov d2,a3
- movbu d3,(82,a3)
+ movbu d1,(82,a3)
  jmp s_dirty
 13:
  cmp 7,a3
@@ -8607,52 +8626,128 @@ fl_stw:
  * Function 0x610934ac turns the dial's state into a setting id in d2 (900 Color Creator, 899 ART, 898 plain, 901 COLOR 1-4,
  * 988 MONO 1-4, else 65535), then SetValue(897, d2) (research/NOTES.md "Creative Dial: the handler found"). .hook_dial is its
  * `cmp 65535,d2` (6 bytes) -> jmp dial_hk, which ends with the same cmp and continues at dial_back (beq 0x61093583).
- * dm_tab = {setting id, film value FV0 + j or 0 = the camera's own} for the four positions that are not COLOR. A position
- * with a film: SetValue(901, film) (fl_set loads the film) and d2 = 901, so the stock code treats the position as COLOR.
- * Not done (ext11 is full: 116 B were free): giving the COLOR position its own earlier pick back. Registers: d3, a2, a3 are
- * the function's own and kept; d2 may change. All DM_* default to 0: the hook does nothing until a film is given. */
-.set DM_MONO, 0
-.set DM_NON, 0
-.set DM_ART, 0
-.set DM_CC, 0
+ * The choice is made on the camera: every film has a "Creative Dial" row (class 10, FR_IT) = its slot byte +50 (record +48,
+ * the old Art Effect, unused: XB_ART 0): 0 Off, 1 MONO, 2 Plain, 3 ART, 4 CC. dial_hk finds the film whose byte equals the
+ * position's code (988 -> 1, 898 -> 2, 899 -> 3, 900 -> 4; the lowest film number if several): its live slot if it sits on
+ * a COLOR, else its saved changes (EDITS.BIN image) if it has any, else the LOOKS.BIN copy. Found: SetValue(901, FV0 + j)
+ * (fl_set loads the film) and d2 = 901, so the stock code treats the position as COLOR. Not found: stock, d2 unchanged.
+ * Registers: d3, a2, a3 are the function's own and kept. Not done: giving the COLOR position its own earlier pick back,
+ * and clearing another film's byte when a position is given to a new film. */
 .section .hook_dial,"ax"
  jmp dial_hk
  .byte 0xcb
 .section .ext11,"ax"
 .balign 4
-dm_tab:
- .short 988, DM_MONO
- .short 898, DM_NON
- .short 899, DM_ART
- .short 900, DM_CC
+dm_ids:
+ .short 988, 898, 899, 900
 dial_hk:
- mov dm_tab,a0
+ mov dm_ids,a0
  mov 4,d1
 1:
  movhu (a0),d0
  cmp d2,d0
  beq 2f
- add 4,a0
+ add 2,a0
  add -1,d1
  bne 1b
  bra 9f
 2:
- movhu (2,a0),d0
- cmp 0,d0
- beq 9f
- mov 901,d2
- add -16,sp                       /* (0) call slot, (4) a2, (8) film */
- mov a2,(4,sp)
- mov d0,(8,sp)
- call facade,[],4                 /* SetValue(901, film) */
+ mov 5,d0
+ sub d1,d0                        /* the position's code 1..4 */
+ add -24,sp                       /* (0) call slot, (4) d3, (8) a2, (12) a3, (16) code, (20) d2 */
+ mov d3,(4,sp)
+ mov a2,(8,sp)
+ mov a3,(12,sp)
+ mov d0,(16,sp)
+ mov d2,(20,sp)
+ PVAL 8f
+ clr d3                           /* k */
+10:
+ mov 1,d2                         /* n */
+11:
+ mov a2,a0
+ add LIDX,a0
+ add d3,a0
+ movbu (a0),d0
+ cmp d2,d0
+ bne 4f
+ mov d3,d0                        /* film sits on COLOR k: its live slot, +50 */
+ asl 6,d0
+ add a2,d0
+ mov d0,a0
+ movbu (82,a0),d0
+ bra 7f
+4:
+ mov d3,d0                        /* j = 5k + n - 1 */
+ asl2 d0
+ add d3,d0
+ add d2,d0
+ add -1,d0
+ mov d0,a3
+ mov (TORG,a2),a0
+ cmp 0,a0
+ beq 5f
+ add TWO,a0
+ mov 1,d1
+ asl d0,d1
+ mov (12,a0),d0
+ and d1,d0
+ beq 5f
+ mov a3,d0                        /* saved changes: record j, +48 */
+ mov d0,d1
+ asl 6,d1
+ asl2 d0
+ add d0,d1
+ add 64,d1
+ add a0,d1
+ mov d1,a0
+ movbu (a0),d0
+ bra 7f
+5:
+ mov (LPTR,a2),a0
+ cmp 0,a0
+ beq 6f
+ mov a3,d0                        /* the LOOKS.BIN copy: record j, +48 */
+ asl 6,d0
+ add d0,a0
+ movbu (80,a0),d0
+ bra 7f
+6:
+ clr d0
+7:
+ mov (16,sp),d1
+ cmp d1,d0
+ beq 12f
+ inc d2
+ cmp 6,d2
+ bne 11b
+ inc d3
+ cmp 4,d3
+ bne 10b
+ bra 8f
+12:
+ mov d3,d0                        /* found: film j = 5k + n - 1 */
+ asl2 d0
+ add d3,d0
+ add d2,d0
+ add -1,d0
+ add FV0,d0
+ mov d0,(16,sp)
+ mov 901,d0
+ mov d0,(20,sp)
+ call facade,[],4                 /* SetValue(901, FV0 + j) */
  mov (a0),a2
  mov (4,a2),a2
- mov (8,sp),a1
+ mov (16,sp),a1
  clr d1
  mov 901,d0
  calls (a2)
- mov (4,sp),a2
- add 16,sp
+8:
+ mov (4,sp),d3
+ mov (8,sp),a2
+ mov (12,sp),a3
+ mov (20,sp),d2
+ add 24,sp
 9:
  cmp 65535,d2
  jmp dial_back

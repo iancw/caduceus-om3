@@ -2362,3 +2362,25 @@ Question (owner): can the dial's positions each pick a COLOR / FILM look (e.g. A
 - Real room: section 6's unloaded gap is 1005568 B; 4 KiB (GX1) and 64 KiB (GX2) were camera-proven by moving the loader
   end word 0x60045e9c; a larger step needs its own camera probe (the old probe branches are not in this repository; only
   the notes above remain). The emulator maps the gap, so emulator-only work can use it, but it proves nothing for the camera.
+
+### Creative Dial: the in-camera assignment row (2026-11-10; branch experiment/dial-probe; EMULATOR ONLY, needs OM3_GAP_KIB=256)
+- Owner chose: a row on each film. Built by reusing the unused Frame row (FR_IT 5381, class 10, ids FRB + k): it is now
+  "Creative Dial" with Off / MONO / Plain / ART / CC (type-4 words in the strip, the left cell and the title; our strings
+  ST_FRM..+5 via st_get / dm_strs). Its value is the film's slot byte +50 (record +48, the old Art Effect; XB_ART 0 so
+  nothing reads it; the 6 o'clock Art Effect wheel slice is switched off in xt_tab), 0..4, so it is saved with the film's
+  changes in EDITS.BIN and a film "as built" has 0. FR_IT is added to pm_list (last row, after Film Grain Effect).
+- `dial_hk` (replaces the poked table): position code 988 -> 1, 898 -> 2, 899 -> 3, 900 -> 4; scans films 0..19 for that
+  byte (live slot if the film sits on its COLOR, else the EDITS.BIN image record if its valid bit is set, else the LOOKS.BIN
+  copy); first hit (lowest film number) -> SetValue(901, FV0 + j) and d2 = 901. No hit -> stock position.
+- Code space: ext11 is now 65888 B (past the camera-proven 65536): build with `OM3_GAP_KIB=256` (build.json
+  `emulator_only`; a plain build now fails the size check). NOT for the camera until a bigger section-6 extension is proven.
+- **Emulator (X):** turning to COLOR opens the film editor; 13 DOWN reaches "Creative Dial" (Off MONO Plain ART CC in the
+  strip); RIGHT steps it (slot byte 0 -> 1 -> 2 ...). Full run: FILM 3 given ART (slot50 = 3), then FILM 1, then the dial to
+  plain, then to ART: P+LIDX COLOR 1 = 3 and the screen shows FILM 3* "Kodachrome 64" (the star = changed, the assignment
+  counts as a change). Script `research/emulator/dial_ui.mjs`.
+- Known gaps: (1) giving a position to a new film does not clear it on the old film (the lowest film number wins);
+  (2) the COLOR position keeps the last film a mapped position set; (3) hold-OK "as built" on a film clears its assignment;
+  (4) not checked: the saved EDITS.BIN keeps the byte after a power cycle, the Control Panel's film editor leaves
+  record +48 alone (it writes Art Effect 0), words in the left cell are plain text (no pictures), the left cell of other
+  rows after adding a 14th row (looked fine on the Picture Mode screen), a photo on a remapped position; (5) nothing here
+  has been on a camera.
