@@ -57,7 +57,7 @@ record when the changes were saved, so a film rebuilt in the Control Panel start
 COLOR 1–4's own settings (check 0). A file that fails the size, magic or CRC check is ignored. Deleting it puts every
 film back as built.
 
-## XMP fields (v1, work in progress: branch `feature/look-in-photo-xmp`, nothing camera-tested)
+## XMP fields (v1)
 
 The look a photo was shot with, written into the photo's XMP packet as `cad:` attributes. The single source of truth is
 `docs/xmp-fields.json` (names, order, record offsets, ranges); `docs/xmp-golden.json` holds exact expected text.
