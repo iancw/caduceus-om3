@@ -1,4 +1,4 @@
-// Creative Dial UI test (emulator only; build with OM3_GAP_KIB=256). Tokens in TOK: dialN (flip the dial to group-5 bit N: 0 MONO, 1 COLOR, 2 plain, 3 ART, 4 Color Creator), key names (down, right, ok ...), keyxN (repeat), main+1 / sub-1, shot:NAME. Prints the GUI state, P+LIDX and the slots' byte +50. OUTD=DIR TOK='dial2 dial1 rightx6 downx13 rightx3 upx13 leftx2 dial2 dial3 shot:final' OM_WORKER_ENTRY=60a8f623 OM_EMU_MODEL=E147 node dial_ui.mjs EMU_DIR out-X/main.bin CARD.omsd (card: this build's GUIDES / LABELS + the release's LOOKS / TONES)
+// Editor test 1 in a full om-emu E147 play session (our script).
 //   OM_EMU_MODEL=E147 node session_ed1.mjs EMU_DIR IMAGE CARD.omsd OUT.json SAVE.omsd 'tokens...'
 // Tokens: s1 (half-press click), ok/down/info/... (key click), main+N / sub+N (dials), wait. After each token: STATE,
 // the editor fields of P (marker, axis, dirty, status), slot 0..3 hue/light/flags, and the settings 928..975 + 2197.
@@ -64,12 +64,13 @@ const rd = (a, n) => lab.sim.read(a >>> 0, n);
 const u16 = (a) => { const b = rd(a, 2); return b[0] | b[1] << 8; };
 const u8 = (a) => rd(a, 1)[0];
 
-const lidx = () => { const st = u16(STATE); if (!(st >= 1)) return 'noP'; const P = POOL + st - 1; return [0, 1, 2, 3].map((k) => u8(P + 712 + k)).join(',') + ' slot50=' + [0, 1, 2, 3].map((k) => u8(P + 32 + 64 * k + 50)).join(','); };
+const lidx = () => { const st = u16(STATE); if (!(st >= 1)) return 'noP'; const P = POOL + st - 1; return [0, 1, 2, 3].map((k) => u8(P + 712 + k)).join(',') + ' dmo=' + ((u16(P + 840) | u16(P + 842) << 16) >>> 0).toString(16) + ' slot50=' + [0, 1, 2, 3].map((k) => u8(P + 32 + 64 * k + 50)).join(','); };
 console.log('start STATE', u16(STATE).toString(16), lidx());
 const pressKey = (k) => { s.key(k, 'down'); s.camapp.pump(); s.idle_slice(lab.lab_time() + 150e6); s.key(k, 'up'); s.camapp.pump(); s.idle_slice(lab.lab_time() + 400e6); };
 for (const tok of (process.env.TOK || '').split(' ').filter(Boolean)) {
   let m;
   if ((m = /^dial(\d)$/.exec(tok))) { flip(+m[1]); console.log(tok, lab.state_names.get(lab.state()) ?? lab.state(), lidx()); }
+  else if ((m = /^savecard:(.+)$/.exec(tok))) { fs.writeFileSync(m[1], cardImage(c0)); console.log('card saved', m[1]); }
   else if ((m = /^shot:(.+)$/.exec(tok))) { shot(process.env.OUTD + '/' + m[1] + '.png'); }
   else if ((m = /^(\w+)x(\d+)$/.exec(tok))) { for (let i = 0; i < +m[2]; i++) pressKey(m[1]); console.log(tok, lab.state_names.get(lab.state()) ?? lab.state(), lidx()); }
   else if ((m = /^(main|sub)([+-]\d+)$/.exec(tok))) { s.dial_input(m[1], parseInt(m[2], 10)); s.camapp.pump(); s.idle_slice(lab.lab_time() + 400e6); console.log(tok, lidx()); }

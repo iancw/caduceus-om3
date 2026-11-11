@@ -2384,3 +2384,22 @@ Question (owner): can the dial's positions each pick a COLOR / FILM look (e.g. A
   record +48 alone (it writes Art Effect 0), words in the left cell are plain text (no pictures), the left cell of other
   rows after adding a 14th row (looked fine on the Picture Mode screen), a photo on a remapped position; (5) nothing here
   has been on a camera.
+
+### Creative Dial: gaps fixed (2026-11-10; emulator only, OM3_GAP_KIB=256; ext11 66080 B)
+- **One film per position:** `dm_scan` (finds the first film whose byte equals a code: live slot of a film on its COLOR, else its
+  saved EDITS.BIN record; the LOOKS.BIN copy is ignored, so old Art Effect ids there do not count) is shared by the hook and
+  the setter; the class-10 setter first runs `dm_uniq` (clear that code on every film that has it, mark EDITS.BIN to save).
+  Emulator: FILM 1 given ART, then FILM 3 given ART: the dial to ART loads FILM 3 (before: FILM 1, the lowest).
+- **COLOR position's own pick:** P+840 (`DMO`, cleared in pf_load, ext8 505 / 512) = 0x10000 | value. On every arrival at a
+  non-COLOR position, if P+DMO is empty and the picture mode is a COLOR k, the pick (the film on COLOR k, FV0 + j, else the
+  COLOR value) is kept; back on the COLOR position it is set again (SetValue 901) and cleared. Emulator: COLOR with FILM 1,
+  plain, ART (mapped FILM 3), COLOR: FILM 1 again, dmo back to 0. (The facade GetValue(901) is film-aware only for the list
+  builder's callers, so the pick is built from the picture mode and P+LIDX.)
+- **Power cycle:** the half-press save wrote EDITS.BIN with FILM 3's record byte +48 = 3 and its valid bit; a new session
+  on that card: the dial to ART loads FILM 3 (emulator).
+- **Control Panel:** `webapp/src/om3.ts` never reads EDITS.BIN and writes Art Effect 0 for firmware 24 (v25Art 'off'); older
+  firmware choices can write ids 1..5 into LOOKS.BIN +48, which a film loaded as built would carry into its live slot byte
+  (read as a dial position) - only for those old exports.
+- **Kept as is:** hold-OK "as built" on a film also clears its dial assignment (the record is dropped). Still not done:
+  a photo on a remapped position, words only (no pictures) in the left cell, anything on a camera, and space (ext11 is past
+  the proven 64 KiB; the gap needs a camera probe).

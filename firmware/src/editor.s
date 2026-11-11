@@ -2113,6 +2113,7 @@ pf_load:
  mov d0,(STC,a2)
  mov d0,(SATB,a2)
  mov d0,(LVB,a2)
+ mov d0,(DMO,a2)                 /* dial probe: the COLOR position has no remembered pick */
  mov PF_LEN + FL_SB,d0            /* v0.24: the file, then the film-name strings (fl_str) */
  call malloc,[],4
  cmp 0,a0
@@ -4039,6 +4040,21 @@ sl_set0:
  blt 7f
  cmp 4,d1
  bgt 7f
+ cmp 0,d1
+ beq 15f
+ add -24,sp                       /* a position belongs to one film: clear it on the others first */
+ mov d0,(4,sp)
+ mov a0,(8,sp)
+ mov a1,(12,sp)
+ mov d1,(16,sp)
+ mov d1,d0
+ call dm_uniq,[d2,d3,a3],20
+ mov (4,sp),d0
+ mov (8,sp),a0
+ mov (12,sp),a1
+ mov (16,sp),d1
+ add 24,sp
+15:
  mov d2,a3
  movbu d1,(82,a3)
  jmp s_dirty
@@ -8627,40 +8643,26 @@ fl_stw:
  * 988 MONO 1-4, else 65535), then SetValue(897, d2) (research/NOTES.md "Creative Dial: the handler found"). .hook_dial is its
  * `cmp 65535,d2` (6 bytes) -> jmp dial_hk, which ends with the same cmp and continues at dial_back (beq 0x61093583).
  * The choice is made on the camera: every film has a "Creative Dial" row (class 10, FR_IT) = its slot byte +50 (record +48,
- * the old Art Effect, unused: XB_ART 0): 0 Off, 1 MONO, 2 Plain, 3 ART, 4 CC. dial_hk finds the film whose byte equals the
- * position's code (988 -> 1, 898 -> 2, 899 -> 3, 900 -> 4; the lowest film number if several): its live slot if it sits on
- * a COLOR, else its saved changes (EDITS.BIN image) if it has any, else the LOOKS.BIN copy. Found: SetValue(901, FV0 + j)
- * (fl_set loads the film) and d2 = 901, so the stock code treats the position as COLOR. Not found: stock, d2 unchanged.
- * Registers: d3, a2, a3 are the function's own and kept. Not done: giving the COLOR position its own earlier pick back,
- * and clearing another film's byte when a position is given to a new film. */
+ * the old Art Effect, unused: XB_ART 0): 0 Off, 1 MONO, 2 Plain, 3 ART, 4 CC. A film's byte counts only where the user
+ * made it: its live slot (the film sits on a COLOR) or its saved changes (EDITS.BIN image record, valid bit); the
+ * LOOKS.BIN copy is ignored (older Control Panel exports carry Art Effect ids there). dm_scan finds the first film (lowest
+ * number) whose byte equals a code. The setter (class 10 in sl_set0) first clears that code on every other film, so a
+ * position belongs to one film. dial_hk: a position with a film -> remember the COLOR position's own pick once
+ * (GetValue 901 -> P+DMO, 0x10000 | value), SetValue(901, FV0 + j) (fl_set loads the film), d2 = 901, so the stock code
+ * treats the position as COLOR; back on the COLOR position -> SetValue(901, the remembered pick). Registers: d3, a2, a3
+ * are the function's own and kept. */
+.set DMO, 840                     /* P+DMO u32: 0 = the COLOR position has its own pick; else 0x10000 | its value (pf_load clears it) */
 .section .hook_dial,"ax"
  jmp dial_hk
  .byte 0xcb
 .section .ext11,"ax"
 .balign 4
 dm_ids:
- .short 988, 898, 899, 900
-dial_hk:
- mov dm_ids,a0
- mov 4,d1
-1:
- movhu (a0),d0
- cmp d2,d0
- beq 2f
- add 2,a0
- add -1,d1
- bne 1b
- bra 9f
-2:
- mov 5,d0
- sub d1,d0                        /* the position's code 1..4 */
- add -24,sp                       /* (0) call slot, (4) d3, (8) a2, (12) a3, (16) code, (20) d2 */
- mov d3,(4,sp)
- mov a2,(8,sp)
- mov a3,(12,sp)
- mov d0,(16,sp)
- mov d2,(20,sp)
- PVAL 8f
+ .short 988, 898, 899, 900, 901
+/* dm_scan: `call dm_scan,[d2,d3,a3],20`, d0 = code 1..4, a2 = P -> d0 = film j or -1, a0 = the byte's address, a1 = the
+ * EDITS.BIN image when the byte is in a saved record (else 0). Uses d1; keeps a2. */
+dm_scan:
+ mov d0,(4,sp)
  clr d3                           /* k */
 10:
  mov 1,d2                         /* n */
@@ -8671,11 +8673,12 @@ dial_hk:
  movbu (a0),d0
  cmp d2,d0
  bne 4f
- mov d3,d0                        /* film sits on COLOR k: its live slot, +50 */
+ mov d3,d0                        /* film (k, n) sits on COLOR k: its live slot, +50 */
  asl 6,d0
  add a2,d0
  mov d0,a0
- movbu (82,a0),d0
+ add 82,a0
+ mov 0,a1
  bra 7f
 4:
  mov d3,d0                        /* j = 5k + n - 1 */
@@ -8684,70 +8687,155 @@ dial_hk:
  add d2,d0
  add -1,d0
  mov d0,a3
- mov (TORG,a2),a0
- cmp 0,a0
- beq 5f
- add TWO,a0
+ mov (TORG,a2),a1
+ cmp 0,a1
+ beq 8f
+ add TWO,a1
  mov 1,d1
  asl d0,d1
- mov (12,a0),d0
+ mov (12,a1),d0
  and d1,d0
- beq 5f
+ beq 8f
  mov a3,d0                        /* saved changes: record j, +48 */
  mov d0,d1
  asl 6,d1
  asl2 d0
  add d0,d1
  add 64,d1
- add a0,d1
- mov d1,a0
- movbu (a0),d0
- bra 7f
-5:
- mov (LPTR,a2),a0
- cmp 0,a0
- beq 6f
- mov a3,d0                        /* the LOOKS.BIN copy: record j, +48 */
- asl 6,d0
- add d0,a0
- movbu (80,a0),d0
- bra 7f
-6:
- clr d0
+ mov a1,a0
+ add d1,a0
 7:
- mov (16,sp),d1
+ movbu (a0),d0
+ mov (4,sp),d1
  cmp d1,d0
  beq 12f
+8:
  inc d2
  cmp 6,d2
  bne 11b
  inc d3
  cmp 4,d3
  bne 10b
- bra 8f
+ mov -1,d0
+ mov 0,a0
+ mov 0,a1
+ ret [d2,d3,a3],20
 12:
- mov d3,d0                        /* found: film j = 5k + n - 1 */
+ mov d3,d0                        /* film j = 5k + n - 1 */
  asl2 d0
  add d3,d0
  add d2,d0
  add -1,d0
- add FV0,d0
- mov d0,(16,sp)
- mov 901,d0
- mov d0,(20,sp)
- call facade,[],4                 /* SetValue(901, FV0 + j) */
+ ret [d2,d3,a3],20
+/* dm_uniq: `call dm_uniq,[d2,d3,a3],20`, d0 = code 1..4, a2 = P: the code is cleared on every film that has it (live slots,
+ * saved records; a saved record then wants saving). Uses d1, a0, a1. */
+dm_uniq:
+ mov d0,(4,sp)
+1:
+ mov (4,sp),d0
+ call dm_scan,[d2,d3,a3],20
+ cmp 0,a0
+ beq 9f
+ clr d0
+ movbu d0,(a0)
+ cmp 0,a1
+ beq 1b
+ mov 1,d0
+ movbu d0,(TW_LEN,a1)             /* EDITS.BIN to save */
+ bra 1b
+9:
+ ret [d2,d3,a3],20
+.macro DMSET                      /* SetValue(901, the value in (16,sp)) (d3, a2 are saved by the caller) */
+ call facade,[],4
  mov (a0),a2
  mov (4,a2),a2
  mov (16,sp),a1
  clr d1
  mov 901,d0
  calls (a2)
+ .endm
+dial_hk:
+ mov dm_ids,a0
+ mov 5,d1
+1:
+ movhu (a0),d0
+ cmp d2,d0
+ beq 2f
+ add 2,a0
+ add -1,d1
+ bne 1b
+ bra 9f
+2:
+ mov 6,d0
+ sub d1,d0                        /* the position's code 1..5 (5 = COLOR) */
+ add -28,sp                       /* (0) call slot, (4) d3, (8) a2, (12) a3, (16) value, (20) d2, (24) GetValue out */
+ mov d3,(4,sp)
+ mov a2,(8,sp)
+ mov a3,(12,sp)
+ mov d2,(20,sp)
+ mov d0,(16,sp)
+ PVAL 8f
+ mov (16,sp),d3
+ cmp 5,d3
+ beq 6f
+ mov (DMO,a2),d0                  /* the COLOR position's own pick: kept once */
+ cmp 0,d0
+ bne 3f
+ mov 111,d0                       /* the picture mode: only a COLOR k (with its film, if any) is a pick to give back */
+ call sget,[],4
+ mov d0,(24,sp)
+ call fl_k,[],0
+ cmp 0,d0
+ blt 3f
+ mov d0,d3                        /* k */
+ mov a2,a0
+ add d3,a0
+ movbu (LIDX,a0),d1
+ extb d1
+ cmp 1,d1
+ blt 5f
+ cmp 5,d1
+ bgt 5f
+ mov d3,d0                        /* the film sitting on COLOR k: FV0 + 5k + n - 1 */
+ asl2 d0
+ add d3,d0
+ add d1,d0
+ add -1,d0
+ add FV0,d0
+ bra 4f
+5:
+ mov (24,sp),d0                   /* COLOR k itself */
+4:
+ or 0x10000,d0
+ mov d0,(DMO,a2)
+3:
+ mov (16,sp),d3
+ mov d3,d0
+ call dm_scan,[d2,d3,a3],20
+ cmp 0,d0
+ blt 8f
+ add FV0,d0
+ mov d0,(16,sp)
+ mov 901,d0
+ mov d0,(20,sp)
+ mov (8,sp),a2
+ DMSET
+ bra 8f
+6:
+ mov (DMO,a2),d0                  /* back on the COLOR position: its own pick again */
+ cmp 0,d0
+ beq 8f
+ exthu d0
+ mov d0,(16,sp)
+ clr d0
+ mov d0,(DMO,a2)
+ DMSET
 8:
  mov (4,sp),d3
  mov (8,sp),a2
  mov (12,sp),a3
  mov (20,sp),d2
- add 24,sp
+ add 28,sp
 9:
  cmp 65535,d2
  jmp dial_back
