@@ -954,7 +954,7 @@ def build(defaults, testfile, out):
                main_bytes_changed=sum(x != y for x, y in zip(m, mc['dec'])),
                ext1=dict(addr=hex(EXT1[0]), bytes=len(blobs['.ext1'])), ext4=dict(addr=hex(EXT4[0]), bytes=len(blobs['.ext4'])), ext10=dict(addr=hex(EXT10[0]), bytes=len(blobs['.ext10'])), ext6=dict(addr=hex(EXT6[0]), bytes=len(blobs['.ext6'])), ext5=dict(addr=hex(EXT5[0]), bytes=len(blobs['.ext5'])), ext3=dict(addr=hex(EXT3[0]), bytes=len(blobs['.ext3'])), ext8=dict(addr=hex(EXT8[0]), bytes=len(blobs['.ext8'])), ext9=dict(addr=hex(EXT9[0]), bytes=len(blobs['.ext9'])), ext15=dict(addr=hex(EXT15[0]), bytes=len(blobs['.ext15'])),
                bundles_bin_sha256=hashlib.sha256(test).hexdigest(), defaults_sha256=hashlib.sha256(dflt).hexdigest(),
-               symbols={k: hex(v) for k, v in syms.items() if k.startswith(('hl_', 'pr_', 'sd_', 'ext', 'ed_', 'k_', 't_', 'gd_', 'wb_', 'lk_', 'rd_'))})
+               symbols={k: hex(v) for k, v in syms.items() if k.startswith(('ex_', 'hl_', 'pr_', 'sd_', 'ext', 'ed_', 'k_', 't_', 'gd_', 'wb_', 'lk_', 'rd_'))})
     (out / 'build.json').write_text(json.dumps(rep, indent=1))
     print(json.dumps({k: v for k, v in rep.items() if k != 'symbols'}, indent=1))
     return syms
@@ -962,7 +962,7 @@ def build(defaults, testfile, out):
 
 def xmp_include():
     """docs/xmp-fields.json -> the code block's include `xmp_tab.inc`: the namespace text and one macro line per field
-    (XVER, XLOOK, XFILM, XNUM, XLIST in xblock.s) in the file's order, and XB_XMP_MAX, the longest text those lines can
+    (XVER, XLOOK, XFILM, XNUM, XHALF, XWBM, XWBK, XLIST in xblock.s) in the file's order, and XB_XMP_MAX, the longest text those lines can
     write (the block refuses to write fields into a packet whose free gap is smaller)."""
     j = json.loads((ROOT / 'docs' / 'xmp-fields.json').read_text())
     pre, ns = j['prefix'], j['namespace']
@@ -976,6 +976,9 @@ def xmp_include():
         if k == 'version': lines.append(f' XVER {f["name"]}'); mx += pf + 2
         elif k == 'look': lines.append(f' XLOOK {f["name"]}'); mx += pf + 15 + 1
         elif k == 'film': lines.append(f' XFILM {f["name"]}'); mx += pf + 2 + 1
+        elif k in ('half', 'wbmode', 'wbkelvin'):          # computed from record bytes (xblock.s XHALF / XWBM / XWBK), at most 2 / 2 / 5 characters
+            assert 0 <= f['off'] < 63
+            lines.append(f' {"XHALF" if k == "half" else "XWBM" if k == "wbmode" else "XWBK"} {f["name"]}, {f["off"]}'); mx += pf + (5 if k == 'wbkelvin' else 2) + 1
         else:
             w = max(3, *(len(str(v)) for v in range(f['min'], f['max'] + 1)))     # xb_put_s writes at most "-99" whatever the byte holds
             assert 0 <= f['off'] < 64
@@ -990,7 +993,7 @@ def make_xblock(out, sy, xtag):
     PC-relative to the firmware), check that relocating the first link gives the second, and pack the block."""
     ext = dict(getter=0x60063380, facade=0x60b8696a, fopen=sy['fopen'], fread=sy['fread'], fclose=sy['fclose'], malloc=0x60024068, sd_crc=sy['sd_crc'], gd_mode=sy['gd_mode'], VDESC=0xa4cf688c, VSTOCK_P=0xa4cf6210, VSTOCK_S=1660, AXIS=684, EDK=687, WL_BLK=sy['wl_blk'], fx_tail=sy['fx_tail'], fx_back=sy['fx_back'], lv_skip=sy['lv_skip'], c11_ret=0x60504edb,
                STATE=sy['STATE'], HMAX=sy['HMAX'], POOL=sy['POOL'], MAGIC=sy['MAGIC'], BUFIDX=0x604afdf9, SF_ENT=0x604be2aa, LOCK=0x60075f73, UNLOCK=0x60075fbc, WINMAP=0x60071018, FLUSH=0x60070e69, free=0x6002409a,
-               SEL=0x6052cf39, fwrite=0x608d4da9, PF_CAPTO=sy['pf_capto'], PF_CAP=sy['pf_cap'], E_LK=sy['e_lk'], E_RET=sy['e_ret'], E_RST=sy['e_rst'], REFRESH=0x611b20ea, XT_TAB=sy['xt_tab'], EMARK=680, EMAGIC=0x45334d4f,
+               SEL=0x6052cf39, fwrite=0x608d4da9, PF_CAPTO=sy['pf_capto'], PF_CAP=sy['pf_cap'], EX_REC=sy['ex_rec'], EX_RK=sy['ex_rk'], E_LK=sy['e_lk'], E_RET=sy['e_ret'], E_RST=sy['e_rst'], REFRESH=0x611b20ea, XT_TAB=sy['xt_tab'], EMARK=680, EMAGIC=0x45334d4f,
                FL_HAS=sy['fl_has'], FACADE=0x60b8696a, AGET=0x603f039d, TXGET=0x604cd921, TXATT=0x604bc0cf, TXPF=0x604b77fb, TWO=sy['TWO'], TW_LEN=sy['TW_LEN'], FV0=sy['FV0'],
                WB_V=sy['wb_v'], wb_wtk=sy['wb_wtk'], wb_wem=sy['wb_wem'], HL_RUN=sy['hl_sel'], RZ_EFF=sy['rz_eff'], BD_RUN=sy['bd_run'], TYPEMAP=0x60555b58,
                TG_OWN=sy['tg_own'], TG_BAD=sy['tg_bad'], GS_EFF=sy['gs_eff'], FD_G=sy['fd_g'], FD_LO=sy['fd_lo'],

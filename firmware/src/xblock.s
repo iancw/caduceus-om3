@@ -3183,6 +3183,52 @@ xmps\@:
  call xb_put_s,[],0
  call xb_put_q,[],0
  .endm
+ .macro XHALF name, off           /* split toning strength: the record's code (v >= 0: 2v half steps, v < 0: -2v - 1) -> half steps 0..10 */
+ XPFX \name
+ movbu (\off,a2),d0
+ extb d0
+ add d0,d0
+ cmp 0,d0
+ bge 1f
+ not d0
+1:
+ call xb_put_s,[],0
+ call xb_put_q,[],0
+ .endm
+ .macro XPAIRV off                /* d0 = lo + 11 hi of the record bytes off, off+1 (film WB pairs, firmware FWENC). Uses d0, d1 */
+ movbu (\off+1,a2),d1
+ extb d1
+ mov 11,d0
+ mul d1,d0
+ movbu (\off,a2),d1
+ extb d1
+ add d1,d0
+ .endm
+ .macro XWBM name, off            /* the film WB mode: its index in the camera's 13 modes (0 = Auto / none, 12 = Custom WB) */
+ XPFX \name
+ XPAIRV \off
+ call xb_put_s,[],0
+ call xb_put_q,[],0
+ .endm
+ .macro XWBK name, off            /* the Custom WB Kelvin, only when the mode (+61 / +62) is Custom WB (12): K = 8000 + 100 v */
+ XPAIRV 61
+ cmp 12,d0
+ bne 1f
+ XPFX \name
+ XPAIRV \off
+ add 80,d0                        /* K / 100, kept inside 20..140 whatever the bytes hold */
+ cmp 20,d0
+ bge 2f
+ mov 20,d0
+2:
+ cmp 140,d0
+ ble 3f
+ mov 140,d0
+3:
+ call xb_put_h,[],0
+ call xb_put_q,[],0
+1:
+ .endm
  .macro XLIST name, off
  XPFX \name
  clr d2
@@ -3249,6 +3295,34 @@ xb_put_s:                         /* leaf: d0 = signed byte value -> decimal tex
 5:
  add 48,d0
  movbu d0,(a3)
+ inc a3
+ retf [],0
+xb_put_h:                         /* leaf: d0 = 20..140 -> d0 * 100 as decimal text at a3 (Kelvin). Uses d0, d1 */
+ cmp 100,d0
+ blt 1f
+ mov 49,d1                        /* "1" */
+ movbu d1,(a3)
+ inc a3
+ add -100,d0
+1:
+ clr d1
+2:
+ cmp 10,d0
+ blt 3f
+ add -10,d0
+ inc d1
+ bra 2b
+3:
+ add 48,d1
+ movbu d1,(a3)
+ inc a3
+ add 48,d0
+ movbu d0,(a3)
+ inc a3
+ mov 48,d1                        /* "00" */
+ movbu d1,(a3)
+ inc a3
+ movbu d1,(a3)
  inc a3
  retf [],0
 xb_put_name:                      /* leaf: a0 = look name (NUL-ended) -> at most 15 characters at a3; anything outside
@@ -3429,6 +3503,21 @@ xb_xmp:
  bne 1b
  mov xb_xrec,a3
  call PF_CAPTO,[d2,d3,a2,a3],28   /* a2 = P, d2 = k, a3 = the scratch record (keeps d2/d3/a2/a3) */
+ mov (EX_RK),d0                   /* the film WB (+59..+62) as the camera has it, taken at the half-press before the shot (ex_live,
+                                     as the photo code does), not the slot's: only when ex_rec holds this COLOR */
+ cmp d2,d0
+ bne 7f
+ mov EX_REC,a0
+ mov a3,a1
+ mov 4,d1
+8:
+ movbu (59,a0),d0
+ movbu d0,(59,a1)
+ inc a0
+ inc a1
+ add -1,d1
+ bne 8b
+7:
  mov xb_xrec,a0
  mov a0,(12,sp)
  mov a2,a0

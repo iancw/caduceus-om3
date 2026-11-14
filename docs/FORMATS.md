@@ -167,11 +167,15 @@ order (one space before each).
 | `Shadows`, `Midtones`, `Highlights` | +44..46 | −7..7 |
 | `GlowClarity` | +47 | −5..−1 Glow, 1..5 Clarity, 0 off |
 | `Art`, `NR`, `VigFix`, `Grain`, `Sharp` | +48..52 | as the record: Art 0..5, NR 0..4 (0 Camera, 1 Std, 2 Low, 3 Off, 4 High), VigFix 0..1, Grain 0..3, Sharp −5..2 |
-| `ShadowColor`, `ShadowStrength`, `HighlightColor`, `HighlightStrength` | +53..56 | colour 0..11, strength −5..5 |
+| `ShadowColor`, `ShadowStrength`, `HighlightColor`, `HighlightStrength` | +53..56 | colour 0..11 (as the record); strength in **half steps, 0..10** (the camera's v0.28 split toning steps are halves; the record's code v ≥ 0 is 2v half steps, v < 0 is −2v − 1) |
+| `Halation` | +57 | 1..5, `0` off (the record checks −5..5) |
+| `ToneBalance` | +58 | −5..5 (minus: the shadow colour reaches further, plus: the highlight colour) |
+| `FilmWbMode` | +61 / +62 | the film's white balance mode, its index in the camera's 13 modes: 0 Auto / none, 1 Sunny, 2 Shade, 3 Cloudy, 4 Incandescent, 5 Fluorescent, 6 Underwater, 7 Flash, 8..11 One-touch 1..4, 12 Custom WB (the record holds it as a pair, v = lo + 11 hi) |
+| `FilmWbKelvin` | +59 / +60 | the Custom WB colour temperature in Kelvin, 2000..14000 in steps of 100 (K = 8000 + 100 v); **only present when `FilmWbMode` is 12** |
 
 Colour order of the three lists (the record's, clockwise from Yellow): Yellow, Orange, Orange-red, Red, Magenta, Violet,
 Blue, Blue-cyan, Cyan, Green-cyan, Green, Yellow-green. Record `+42` (legacy Sharpness) is not written. The values are
-the settings as applied at the shot (a film edited on the camera shows the edited values).
+the settings as applied at the shot (a film edited on the camera shows the edited values). The film WB is the camera's own white balance at the half-press before the shot, as in the photo code (`om3.1.`) in the UserComment.
 
 ## BUNDLES.BIN (544 bytes)
 

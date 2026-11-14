@@ -10002,5 +10002,10 @@ main's own `lookFromRecord` was kept); the firmware hooks (`editor.s`, `xblock.s
 - **Build** in the om3-linux container (`out-xmp8`: GUIDES.BIN 15380 of 16448 B). **Emulator, this build:** formatter 10 / 10 cases byte-equal
   to `docs/xmp-golden.json`; hook scenarios 7 / 7 (film, rating edit, awkward name, own settings, film over film, restore hook);
   webapp 83 tests pass, 26 of them XMP incl. the firmware's packet read back (`XMP_EMU_JSON`). Not rerun: the editor-session identity check.
-- **Gap, not done:** the field contract is from before v0.28. Halation, the film's own white balance and the split-toning half steps
-  (record +57..+63) are not in `docs/xmp-fields.json`, so a photo does not carry them.
+- **v0.28 fields added (same day; emulator only; build `xmp9`):** the contract now also has `Halation` (+57), `ToneBalance` (+58),
+  `FilmWbMode` (index 0..12, pair +61/+62) and `FilmWbKelvin` (Kelvin, only when the mode is Custom, pair +59/+60), and the split
+  toning strengths are **half steps 0..10** (the record holds v0.28 codes; the reader turns them back, `lookFromRecord(..., v28)`).
+  The film WB bytes come from `ex_rec` (the half-press record the photo code uses, `ex_live`) when `ex_rk` is this COLOR, else from the
+  slot via `pf_capto`: `build.py` exports `EX_REC` / `EX_RK` to the block. New in `xblock.s`: `XHALF`, `XPAIRV`, `XWBM`, `XWBK`, `xb_put_h`.
+  GUIDES.BIN 15704 of 16448 B. Emulator: formatter 11 / 11 golden cases (new: Custom WB, half steps; extremes with 14000 K), hook scenarios
+  9 / 9 (new: film WB from `ex_rec`, and the slot fallback), webapp tests incl. the firmware packet read back. Not rerun: the editor-session check.

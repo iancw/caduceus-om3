@@ -37,9 +37,37 @@ describe('cadText (the reference formatter)', () => {
     });
   }
   it('lists every field of xmp-fields.json, in order, once', () => {
-    const t = cadText(unhex(golden.cases[0].record), 1, 'X');
+    const c = golden.cases.find((x) => x.name.startsWith('Custom WB'))!;      // Custom WB, so the Kelvin field is there too
+    const t = cadText(unhex(c.record), 1, 'X');
     const got = [...t.matchAll(/ cad:(\w+)="/g)].map((m) => m[1]);
     expect(got).toEqual(fields.fields.map((f) => f.name));
+  });
+});
+
+describe('the v0.28 fields', () => {
+  const c = golden.cases.find((x) => x.name.startsWith('Custom WB'))!;
+  it('the split toning strengths are half steps, Kelvin only with Custom WB', () => {
+    expect(c.text).toContain('cad:ShadowStrength="5"');
+    expect(c.text).toContain('cad:HighlightStrength="10"');
+    expect(c.text).toContain('cad:FilmWbMode="12" cad:FilmWbKelvin="5400"');
+    expect(golden.cases[0].text).not.toContain('FilmWbKelvin');
+  });
+  it('a photo gives back halation, tone balance, the film WB and the half steps', () => {
+    const { look, film } = lookFromPhoto(jpeg(packet(c.text)));
+    expect(film).toBe(7);
+    expect(look.halation).toBe(5);
+    expect(look.tone_balance).toBe(3);
+    expect(look.film_wb).toEqual({ mode: 'custom', kelvin: 5400 });
+    expect(look.split).toMatchObject({ sh_color: 6, sh: 2.5, hl: 5 });
+  });
+  it('a photo with a fixed WB mode has no Kelvin', () => {
+    const { look } = lookFromPhoto(jpeg(packet(golden.cases[0].text)));
+    expect(look.film_wb).toEqual({ mode: 'sunny' });
+    expect(look.halation).toBe(2);
+  });
+  it('refuses a Kelvin that is not a multiple of 100 and a half step count over 10', () => {
+    expect(() => readCad(packet(c.text.replace('FilmWbKelvin="5400"', 'FilmWbKelvin="5450"')).toString('utf8'))).toThrow(/FilmWbKelvin/);
+    expect(() => readCad(packet(c.text.replace('HighlightStrength="10"', 'HighlightStrength="11"')).toString('utf8'))).toThrow(/HighlightStrength/);
   });
 });
 
@@ -121,7 +149,9 @@ describe('exiftool config (docs/caduceus-xmp.config)', () => {
     expect(get('Film')).toBe('1');
     expect(get('Look')).toBe('Portra 400');
     expect(get('Hue')).toBe('0,0,0,1,0,0,0,0,0,0,0,0');
-    expect(get('HighlightStrength')).toBe('-1');
+    expect(get('HighlightStrength')).toBe('1');
+    expect(get('Halation')).toBe('2');
+    expect(get('FilmWbMode')).toBe('1');
   });
 });
 

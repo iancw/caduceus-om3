@@ -157,10 +157,10 @@
   },
   {
    "name": "ShadowStrength",
-   "kind": "num",
+   "kind": "half",
    "off": 54,
-   "min": -5,
-   "max": 5
+   "min": 0,
+   "max": 10
   },
   {
    "name": "HighlightColor",
@@ -171,10 +171,38 @@
   },
   {
    "name": "HighlightStrength",
-   "kind": "num",
+   "kind": "half",
    "off": 56,
+   "min": 0,
+   "max": 10
+  },
+  {
+   "name": "Halation",
+   "kind": "num",
+   "off": 57,
    "min": -5,
    "max": 5
+  },
+  {
+   "name": "ToneBalance",
+   "kind": "num",
+   "off": 58,
+   "min": -5,
+   "max": 5
+  },
+  {
+   "name": "FilmWbMode",
+   "kind": "wbmode",
+   "off": 61,
+   "min": 0,
+   "max": 12
+  },
+  {
+   "name": "FilmWbKelvin",
+   "kind": "wbkelvin",
+   "off": 59,
+   "min": 2000,
+   "max": 14000
   }
  ]
 }

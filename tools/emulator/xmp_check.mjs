@@ -209,6 +209,17 @@ if (process.env.XMP_HOOK && fmt) {
       const v = view(), squash = (x) => x.replace(/\s+/g, '');
       add('restore hook: fields gone after the writer copied them, a0 = d2 + 2301, d2 kept', f0.fields.includes('cad:Film="3"') && done && a0 === D2 + 2301 && d2 === D2 && !v.s.includes('cad:') && squash(v.s) === squash(stockPkt().toString('latin1')) && v.got.length === PACKET_LEN && v.s.endsWith('<?xpacket end="w"?>'), { done, a0: a0.toString(16), d2: d2.toString(16), had_fields: f0.fields.length });
     }
+    // (g) the film WB comes from ex_rec (the half-press record, as the photo code) when it holds this COLOR; else from the slot (neutral here)
+    { const syms = JSON.parse(fs.readFileSync(process.env.XMP_FMT_DIR + '/build.json', 'utf8')).symbols, EXRK = parseInt(syms.ex_rk, 16), EXREC = parseInt(syms.ex_rec, 16);
+      const oldRk = [...rd(EXRK, 4)], oldRec = [...rd(EXREC + 59, 4)];
+      dd.write(P + 712, Uint8Array.from([0]));
+      dd.write(EXRK, Uint8Array.from([0, 0, 0, 0])); dd.write(EXREC + 59, Uint8Array.from([0xfc, 0xfe, 0x01, 0x01]));   // COLOR 1, Custom WB 5400 K (v = -26: lo -4, hi -2; mode 12: lo 1, hi 1)
+      const g1 = runHook();
+      add('film WB from the half-press record: Custom WB, 5400 K', common(g1) && g1.fields.includes(' cad:FilmWbMode="12" cad:FilmWbKelvin="5400"'), { fields_tail: g1.fields.slice(-120) });
+      dd.write(EXRK, Uint8Array.from([0xff, 0xff, 0xff, 0xff]));
+      const g2 = runHook();
+      add('no half-press record for this COLOR: the slot\'s film WB (none), no Kelvin', common(g2) && g2.fields.includes(' cad:FilmWbMode="0"') && !g2.fields.includes('FilmWbKelvin'), { fields_tail: g2.fields.slice(-120) });
+      dd.write(EXRK, Uint8Array.from(oldRk)); dd.write(EXREC + 59, Uint8Array.from(oldRec)); }
     // restore the poked state
     dd.write(P + 712, Uint8Array.from([oldLidx])); dd.write(nameAt(2), Uint8Array.from(oldName)); dd.write(nameAt(4), Uint8Array.from(oldName3));
     scen.ok = scen.cases.every((x) => x.ok);
