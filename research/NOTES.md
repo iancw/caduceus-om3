@@ -9992,3 +9992,15 @@ Sizes now: GUIDES.BIN 15212 of 16448 B; ext11 65488 of 65536 (48 B left).
 **Open, camera only:** (1) the look is read from the camera's live state when the JPEG header is built, not from the shot: an in-camera RAW development or a JPEG re-save of an older photo while COLOR 1-4 is current would carry the current look (which playback paths reach 0x60558a64 is unknown); (2) the getter / `pf_capto` calls during the JPEG write (v0.24 rebooted from a getter call at capture); (3) stack headroom in the writer's task for the added depth (stub 16, `xb_xmp` 60, `xb_xfmt` 44 or `pf_capto` 28, plus the getter); (4) what editors do with the fields; (5) privacy: every shared JPG now carries the look's name and settings (no off switch: the owner's call).
 Camera test (owner): JPEG with a film, with COLOR's own settings and in a non-COLOR mode; two RAW+JPEG shots in a row with different looks, then a RAW-only shot; an in-camera RAW development or JPEG re-save of an old photo with a film selected; no reboots or freezes. Send the files; read with `exiftool -config docs/caduceus-xmp.config -XMP-cad:all` (the ORFs should carry no cad: fields).
 Deferred (reviewer's minors): the FORMATS table and config ranges are hand copies (a test only checks names and the namespace); the firmware replaces name characters per byte, `cadText` per UTF-16 unit (equal for the ASCII names the card holds); the Control Panel shows neither the film number nor marks an own-settings look; space is nearly gone (ext11 48 B, block 1236 B).
+
+#### The look in the photo, brought forward onto v0.29.1 (2026-11-14; emulator only, camera test pending)
+Branch `feature/look-in-photo-xmp-v2` = the `feature/look-in-photo-xmp` commits (from main of 2026-11-10) re-applied on main at v0.29.1
+(`0b1d5cb`); the old branch is untouched. Conflicts were only text (README banner, NOTES, `build.py`'s GUIDES step, `main.ts`, `om3.ts`:
+main's own `lookFromRecord` was kept); the firmware hooks (`editor.s`, `xblock.s`, `editor.ld`) applied without changes.
+- **Why it still works with the films in camera memory:** `xb_xmp` reads the name and film from `P+LPTR`, the LOOKS image (names at +1312);
+  since f1/f2 that image is filled from the block in M instead of the card, but its layout is the same.
+- **Build** in the om3-linux container (`out-xmp8`: GUIDES.BIN 15380 of 16448 B). **Emulator, this build:** formatter 10 / 10 cases byte-equal
+  to `docs/xmp-golden.json`; hook scenarios 7 / 7 (film, rating edit, awkward name, own settings, film over film, restore hook);
+  webapp 83 tests pass, 26 of them XMP incl. the firmware's packet read back (`XMP_EMU_JSON`). Not rerun: the editor-session identity check.
+- **Gap, not done:** the field contract is from before v0.28. Halation, the film's own white balance and the split-toning half steps
+  (record +57..+63) are not in `docs/xmp-fields.json`, so a photo does not carry them.
