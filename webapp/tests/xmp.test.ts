@@ -118,14 +118,14 @@ describe('lookFromPhoto', () => {
   });
   it('says so for a packet with no Caduceus fields', () => {
     expect(msg(() => lookFromPhoto(jpeg(packet(''))))).toMatch(/Caduceus/);
-    expect(msg(() => lookFromPhoto(jpeg(packet(' xmlns:cad="https://androidfanman.github.io/caduceus-om3/ns/1/"'))))).toMatch(/Caduceus/);
+    expect(msg(() => lookFromPhoto(jpeg(packet(' xmlns:cad="https://om-recipes.com/caduceus/ns/1/"'))))).toMatch(/Caduceus/);
   });
   it('says so for a file cut off inside the packet', () => {
     const j = jpeg(packet(golden.cases[0].text));
     expect(msg(() => lookFromPhoto(j.subarray(0, j.length >> 1)))).toMatch(/XMP|Caduceus/);
   });
   it('says so for a packet cut off inside the Caduceus text', () => {
-    const cut = packet(golden.cases[0].text.slice(0, 300));
+    const t = golden.cases[0].text, cut = packet(t.slice(0, t.lastIndexOf(' cad:', 300)));      // cut between two fields
     expect(msg(() => lookFromPhoto(jpeg(cut)))).toMatch(/cad:\w+ is missing/);
   });
   it('findXmp returns null when there is none', () => {
