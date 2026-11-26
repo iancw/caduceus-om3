@@ -22,7 +22,7 @@
 
  .section .ext14,"ax"
 
- .set HR_WRK, 0x60fc4000          /* the work area (build.py: free in the image, loaded) */
+ .set HR_WRK, 0x60fc5000          /* the work area (build.py: free in the image, loaded) */
  .set HR_MAXC, 81920              /* fine cells (5184 x 3888 = 78,732) */
  .set HR_MAXC6, 8192              /* 64 px cells */
  .set HR_EF, HR_WRK               /* Ef, then v, then g (u16) */

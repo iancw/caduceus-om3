@@ -10951,7 +10951,18 @@ gs_zk:
  * writer copies it, 2301 bytes, a few instructions later) and may rewrite it with the look; then the two instructions run
  * and the writer goes on at 0x60455cff. a0, a1, d1 are kept (xb_xmp keeps d2, d3, a2, a3). No block: the stock writer. */
 .section .hook_xmp,"ax"
- jmp s_xmp                        /* stock 0x60455cfa: 2c ff 00 f0 51 */
+ jmp xm_g                         /* stock 0x60455cfa: 2c ff 00 f0 51 */
+
+.section .ext1,"ax"
+xm_g:                             /* section gate (tools/test/static_check.py, section order): section 6 (s_xmp, the code block) ready? Else the stock instructions. d0 is free: the next stock instruction writes it */
+ mov (SEC_READY),d0
+ and 0x20,d0
+ beq 1f
+ jmp s_xmp
+1:
+ mov 255,d0
+ movbu d0,(a1)
+ jmp xmp_back
 
 .section .ext11,"ax"
 s_xmp:
@@ -10977,7 +10988,18 @@ s_xmp:
  * code block +168 (xb_xmpr) puts the master packet back to the stock tail (the Exif context object holding it is copied for
  * other metadata, e.g. a RAW's, so this shot's look must not stay in it). Only d2 is live (the output pointer): xb_xmpr keeps it. */
 .section .hook_xmp2,"ax"
- jmp s_xmp2                       /* stock 0x60455d39: 24 fd 08 f1 68 */
+ jmp xm_g2                        /* stock 0x60455d39: 24 fd 08 f1 68 */
+
+.section .ext1,"ax"
+xm_g2:                            /* the same gate; d0 is free (the writer returns its pointer in a0) */
+ mov (SEC_READY),d0
+ and 0x20,d0
+ beq 1f
+ jmp s_xmp2
+1:
+ mov 2301,a0
+ add d2,a0
+ jmp xmp_back2
 
 .section .ext11,"ax"
 s_xmp2:
@@ -20065,8 +20087,8 @@ bd_run:
  * were 16 with four registers saved, so each call overwrote a saved register; harmless for their callers in f1). */
 .section .ext12,"ax"
  .set UB_C, 0x6295a700             /* M image 0x62920700 + 0x3A000 */
- .set CV_STU, 0xa0fa9000           /* rgb-curves 2b: the curves record's buffers for ub_wr / ss_wr (rgbcurves.inc CW_SU / */
- .set CV_STS, 0xa0faa000           /* CW_SS in its work area; checked there) */
+ .set CV_STU, 0xa0faa000           /* rgb-curves 2b: the curves record's buffers for ub_wr / ss_wr (rgbcurves.inc CW_SU / */
+ .set CV_STS, 0xa0fab000           /* CW_SS in its work area; checked there) */
  .set UB_U, 0xa295a700
  .set UB_DIRTY, 0xa32bfb32
  .set UB_BUSY, 0xa32a9904

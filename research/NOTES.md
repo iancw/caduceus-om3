@@ -10009,3 +10009,17 @@ main's own `lookFromRecord` was kept); the firmware hooks (`editor.s`, `xblock.s
   slot via `pf_capto`: `build.py` exports `EX_REC` / `EX_RK` to the block. New in `xblock.s`: `XHALF`, `XPAIRV`, `XWBM`, `XWBK`, `xb_put_h`.
   GUIDES.BIN 15704 of 16448 B. Emulator: formatter 11 / 11 golden cases (new: Custom WB, half steps; extremes with 14000 K), hook scenarios
   9 / 9 (new: film WB from `ex_rec`, and the slot fallback), webapp tests incl. the firmware packet read back. Not rerun: the editor-session check.
+
+#### The look in the photo, rebased onto v0.40.3 main (2026-11-25; emulator only, camera test pending; build `xmp10`)
+Branch `feature/look-in-photo-xmp-v2` rebased onto main c14642d. What had to change:
+- **Code block entries:** main uses +152 for `xb_szo` (data), so `xb_xmp` is +160 and `xb_xmpr` +168 (stubs and `xblock.s`).
+- **Size:** main's GUIDES.BIN is 14772 B and only about 200 B of the built-in files' reserve is free (they must end before the curves' work area, `CV_WRK`),
+  so the straight-line field code (+2.3 KB) did not fit. The formatter is now one loop over a table that `build.py` writes from `docs/xmp-fields.json`
+  (`xb_xtab`: kind, record offset, `NAME="`): GUIDES.BIN 16264 of 16448. The reserve after the built-in files moved up 4 KiB: `CV_WRK` (+ `CV_STU` / `CV_STS`),
+  `.ext13`, `.ext14` (`HR_WRK`) and the start of `.ext15` (0x6101e000, 135,168 B left of it; the loader end word 0x6103f000 is unchanged).
+- **Section gates:** both hooks now go through `xm_g` / `xm_g2` (.ext1: SEC_READY bit 0x20, else the stock instructions), as `static:section-order` requires.
+- **Bug found on the way:** a leaf's return address is in MDR, which `mul` overwrites (`xb_pair` first used `mul`: the formatter ran off to 0x8008).
+- **Emulator (om-emu cafd92d, the pin):** `xmp_check.mjs` formatter 11 / 11 golden cases, hook scenarios 9 / 9. `tools/test/emu_test.py`: 124 pass; the same 5 FAILs
+  as on unmodified main in this workspace (four `color-wheel-*`, `halation-radius-pictures-as-drawn`), and `static:hook-list` for the two new hooks
+  `hook_xmp` 0x60455cfa and `hook_xmp2` 0x60455d39 (both in the JPEG XMP writer, run only when a photo is written, gated by SEC_READY and by the code block):
+  `tools/test/hooks.json` is NOT updated yet, it waits for the owner's go-ahead. No `emu_test.py` test for this feature yet.

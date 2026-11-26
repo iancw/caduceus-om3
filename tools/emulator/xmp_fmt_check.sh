@@ -5,4 +5,5 @@ set -e
 . "$HOME/om3-work/env.sh"
 O="$HOME/om3-work/out-${1:?name}"
 python3 "$OM3_REPO/tools/emulator/card_add_file.py" "$OM3_CARD" "$O/card.omsd" "$O/GUIDES.BIN" OM3MOD GUIDES.BIN >/dev/null
-XMP_HOOK=${XMP_HOOK:-} XMP_SCEN=${XMP_SCEN:-} XMP_FMT_DIR="$O" OM_EMU_MODEL=E147 OM_WORKER_ENTRY=60a8f623 node "$OM3_REPO/tools/emulator/xmp_check.mjs" "$OM3_EMU" "$O/main.bin" "$O/card.omsd" "$O/xmp.json" 's1'
+ENTRY=$("$OM3_TOOLCHAIN/binutils/nm-new" "$O/p.elf" | awk '$3=="lg_wk"{print $1}' | sed 's/^0*//')   # the debug log writer task entry, as tools/test/emu_test.py
+XMP_HOOK=${XMP_HOOK:-} XMP_SCEN=${XMP_SCEN:-} XMP_FMT_DIR="$O" OM_EMU_MODEL=E147 OM_WORKER_ENTRY=$ENTRY node "$OM3_REPO/tools/emulator/xmp_check.mjs" "$OM3_EMU" "$O/main.bin" "$O/card.omsd" "$O/xmp.json" 's1'

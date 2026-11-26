@@ -160,9 +160,9 @@ EXT10 = (0x61aa4300, 0x61aa47f0)
 EXT8 = (0x617e45f0, 0x617e47f0)            # section-8 tail (FF from 0x617e45e0, end 0x617e4800)
 EXT11 = (0x60f49800, 0x60f59800)           # v0.23: section 6 extended by 64 KiB (loader end word 0x60045e9c raised; camera-proven GX2)
 EXT12 = (0x60f59800, 0x60f99800)           # v0.27: section 6 extended by 256 KiB more (camera-proven GX3, 2026-11-10)
-EXT13 = (0x60fac000, 0x60fc0000)           # v0.30 test 10: the debug log, after the RGB work area (GX4-proven reserve to 0x6103f000);
-EXT14 = (0x60fc0000, 0x60fc4000)           # Halation Radius: its code; then its work area HR_WRK .. HR_END (hradius.s), in the GX4-proven reserve
-EXT15 = (0x6101d000, 0x6103f000)           # fix99-4 (owner, 2026-11-20: "open the space"): the rest of the GX4-proven reserve, after
+EXT13 = (0x60fad000, 0x60fc1000)           # v0.30 test 10: the debug log, after the RGB work area (GX4-proven reserve to 0x6103f000);
+EXT14 = (0x60fc1000, 0x60fc5000)           # Halation Radius: its code; then its work area HR_WRK .. HR_END (hradius.s), in the GX4-proven reserve
+EXT15 = (0x6101e000, 0x6103f000)           # fix99-4 (owner, 2026-11-20: "open the space"): the rest of the GX4-proven reserve, after
                                            # Halation Radius's work area (HR_END) to section 7's start; loaded with section 6 (end word 0x6103f000)
                                             # gentler Shading s1: + 16 KB for the vignette pass and its tables (still inside the reserve)
 EXT3 = (0x6081fe10, 0x6081fffc)            # section-3 tail (FF from 0x6081fe00, end 0x60820000)
@@ -915,9 +915,9 @@ def build(defaults, testfile, out):
         at = (at + len(b) + 15) & ~15
     vf_end = (at + 0xfff) & ~0xfff
     # rgb-curves: the curve page's work area (editor's CV_WRK, uncached) right after, loaded too (GX4-proven space)
-    assert vf_end <= 0x60fa3000 and sy['CV_WRK'] == 0xa0fa3000, (hex(vf_end), hex(sy['CV_WRK']))
-    assert set(m[o(at):o(0x60fa3000 + 0x9000)]) <= {0xff}, 'the work area is not free in the firmware image'
-    vf_end = 0x60fa3000 + 0x9000
+    assert vf_end <= 0x60fa4000 and sy['CV_WRK'] == 0xa0fa4000, (hex(vf_end), hex(sy['CV_WRK']))
+    assert set(m[o(at):o(0x60fa4000 + 0x9000)]) <= {0xff}, 'the work area is not free in the firmware image'
+    vf_end = 0x60fa4000 + 0x9000
     # v0.30 test 10: the debug log (.ext13, written with ext11 / ext12) right after the work area, loaded too
     assert EXT13[0] == vf_end
     vf_end = (EXT13[0] + len(blobs['.ext13']) + 0xfff) & ~0xfff
@@ -961,30 +961,32 @@ def build(defaults, testfile, out):
 
 
 def xmp_include():
-    """docs/xmp-fields.json -> the code block's include `xmp_tab.inc`: the namespace text and one macro line per field
-    (XVER, XLOOK, XFILM, XNUM, XHALF, XWBM, XWBK, XLIST in xblock.s) in the file's order, and XB_XMP_MAX, the longest text those lines can
-    write (the block refuses to write fields into a packet whose free gap is smaller)."""
+    """docs/xmp-fields.json -> the code block's include `xmp_tab.inc`: the namespace text, the prefix ` cad:`, the field
+    table xb_xtab (per field: kind, record offset, `NAME="`; read by the loop in xblock.s xb_xfmt) and XB_XMP_MAX, the
+    longest text those fields can write (the block refuses to write fields into a packet whose free gap is smaller)."""
     j = json.loads((ROOT / 'docs' / 'xmp-fields.json').read_text())
     pre, ns = j['prefix'], j['namespace']
-    assert pre == 'cad' and j['version'] == 1 and '"' not in ns and '\\' not in ns     # the macros spell ` cad:NAME="` and "1"
+    assert pre == 'cad' and j['version'] == 1 and '"' not in ns and '\\' not in ns     # the block spells ` cad:` and "1"
+    KIND = dict(version=1, look=2, film=3, num=4, list12=5, half=6, wbmode=7, wbkelvin=8)     # xblock.s xb_xfmt
     s = f' xmlns:{pre}="{ns}"'
-    lines = [' .text 1', 'xb_xns:', f' .asciz "{s.replace(chr(34), chr(92) + chr(34))}"', ' .text 0', ' mov xb_xns,a0', ' call xb_put_str,[],0']
+    q = lambda t: t.replace(chr(34), chr(92) + chr(34))
+    lines = [' .text 1', 'xb_xns:', f' .asciz "{q(s)}"', 'xb_xpfx:', f' .asciz " {pre}:"', 'xb_xtab:']
     mx = len(s)
     for f in j['fields']:
         pf = len(f' {pre}:{f["name"]}="')
         k = f['kind']
-        if k == 'version': lines.append(f' XVER {f["name"]}'); mx += pf + 2
-        elif k == 'look': lines.append(f' XLOOK {f["name"]}'); mx += pf + 15 + 1
-        elif k == 'film': lines.append(f' XFILM {f["name"]}'); mx += pf + 2 + 1
-        elif k in ('half', 'wbmode', 'wbkelvin'):          # computed from record bytes (xblock.s XHALF / XWBM / XWBK), at most 2 / 2 / 5 characters
-            assert 0 <= f['off'] < 63
-            lines.append(f' {"XHALF" if k == "half" else "XWBM" if k == "wbmode" else "XWBK"} {f["name"]}, {f["off"]}'); mx += pf + (5 if k == 'wbkelvin' else 2) + 1
+        off = f.get('off', 0)
+        assert k in KIND and 0 <= off < 63 and f['name'].isalnum()
+        lines += [f' .byte {KIND[k]}, {off}', f' .asciz "{q(f["name"] + chr(61) + chr(34))}"']
+        if k == 'version': mx += pf + 2
+        elif k == 'look': mx += pf + 15 + 1
+        elif k == 'film': mx += pf + 2 + 1
+        elif k in ('half', 'wbmode'): mx += pf + 2 + 1                       # xb_put_s writes at most "-99" (here 2 characters)
+        elif k == 'wbkelvin': assert off == 59; mx += pf + 5 + 1          # the block reads the mode at +61 (xb_xfmt)
         else:
             w = max(3, *(len(str(v)) for v in range(f['min'], f['max'] + 1)))     # xb_put_s writes at most "-99" whatever the byte holds
-            assert 0 <= f['off'] < 64
-            if k == 'num': lines.append(f' XNUM {f["name"]}, {f["off"]}'); mx += pf + w + 1
-            elif k == 'list12': lines.append(f' XLIST {f["name"]}, {f["off"]}'); mx += pf + 12 * w + 11 + 1
-            else: raise SystemExit(f'xmp-fields.json: unknown kind {k}')
+            mx += pf + (12 * w + 11 if k == 'list12' else w) + 1
+    lines += [' .byte 0', ' .text 0', ' mov xb_xns,a0', ' call xb_put_str,[],0']
     return '\n'.join(lines) + f'\n .set XB_XMP_MAX, {mx}\n', mx
 
 

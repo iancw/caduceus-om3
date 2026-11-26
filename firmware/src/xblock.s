@@ -3138,116 +3138,22 @@ xb_wgp:                           /* per glyph: row pointer (+0), width (+20), x
  * buffer (0x62a982e6). It rewrites the packet from the closing quote of xmp:Rating="N" up to the end marker: our cad: fields
  * (when COLOR 1..4 is the effective profile) + the stock tail + blank padding; the packet length, the end marker and the
  * Rating digit stay. Nothing is written when the packet is not a built stock packet (the emulator never builds one).
- * Text lines come from `xmp_tab.inc` (build.py, from docs/xmp-fields.json), so names, order and offsets are the contract's.
+ * The fields are a table (`xmp_tab.inc`: build.py, from docs/xmp-fields.json) read by one loop in xb_xfmt, so names, order and offsets are the contract's.
  * Stores: the packet region [ins, end marker), xb_xrec, its own stack. Calls the editor's pf_capto (as xb_lkd does). */
- .macro XPFX name                 /* append ` cad:NAME="` (the prefix is "cad": build.py checks docs/xmp-fields.json) */
- .text 1
-xmps\@:
- .ascii " cad:"
- .ascii "\name"
- .asciz "=\""
- .text 0
- mov xmps\@,a0
- call xb_put_str,[],0
- .endm
- .macro XVER name
- XPFX \name
- mov 49,d0                        /* "1" */
- movbu d0,(a3)
- inc a3
- call xb_put_q,[],0
- .endm
- .macro XFILM name
- XPFX \name
- mov d3,d0
- call xb_put_s,[],0
- call xb_put_q,[],0
- .endm
- .macro XLOOK name                /* only with a film's name: (8,sp) = its address */
- mov (8,sp),a0
- cmp 0,a0
- beq 1f
- movbu (a0),d0
- cmp 0,d0
- beq 1f
- XPFX \name
- mov (8,sp),a0
- call xb_put_name,[],0
- call xb_put_q,[],0
-1:
- .endm
- .macro XNUM name, off
- XPFX \name
- movbu (\off,a2),d0
- extb d0
- call xb_put_s,[],0
- call xb_put_q,[],0
- .endm
- .macro XHALF name, off           /* split toning strength: the record's code (v >= 0: 2v half steps, v < 0: -2v - 1) -> half steps 0..10 */
- XPFX \name
- movbu (\off,a2),d0
- extb d0
- add d0,d0
- cmp 0,d0
- bge 1f
- not d0
-1:
- call xb_put_s,[],0
- call xb_put_q,[],0
- .endm
- .macro XPAIRV off                /* d0 = lo + 11 hi of the record bytes off, off+1 (film WB pairs, firmware FWENC). Uses d0, d1 */
- movbu (\off+1,a2),d1
+xb_pair:                          /* leaf: d0 = the record offset of a pair's low byte (film WB, v = lo + 11 hi, firmware FWENC) -> d0 = v. Uses d0, d1, a0 */
+ mov a2,a0
+ add d0,a0
+ movbu (1,a0),d1
  extb d1
- mov 11,d0
- mul d1,d0
- movbu (\off,a2),d1
+ mov d1,d0
+ asl 3,d0                         /* 11 hi without mul (a leaf's return address is in MDR, which mul overwrites) */
+ add d1,d0
+ add d1,d1
+ add d1,d0
+ movbu (a0),d1
  extb d1
  add d1,d0
- .endm
- .macro XWBM name, off            /* the film WB mode: its index in the camera's 13 modes (0 = Auto / none, 12 = Custom WB) */
- XPFX \name
- XPAIRV \off
- call xb_put_s,[],0
- call xb_put_q,[],0
- .endm
- .macro XWBK name, off            /* the Custom WB Kelvin, only when the mode (+61 / +62) is Custom WB (12): K = 8000 + 100 v */
- XPAIRV 61
- cmp 12,d0
- bne 1f
- XPFX \name
- XPAIRV \off
- add 80,d0                        /* K / 100, kept inside 20..140 whatever the bytes hold */
- cmp 20,d0
- bge 2f
- mov 20,d0
-2:
- cmp 140,d0
- ble 3f
- mov 140,d0
-3:
- call xb_put_h,[],0
- call xb_put_q,[],0
-1:
- .endm
- .macro XLIST name, off
- XPFX \name
- clr d2
-1:
- mov a2,a0
- add d2,a0
- movbu (\off,a0),d0
- extb d0
- call xb_put_s,[],0
- inc d2
- cmp 12,d2
- beq 2f
- mov 44,d0                        /* "," */
- movbu d0,(a3)
- inc a3
- bra 1b
-2:
- call xb_put_q,[],0
- .endm
+ retf [],0
 
 xb_put_q:                         /* leaf: append a quote at a3. Uses d0 */
  mov 34,d0
@@ -3449,7 +3355,122 @@ xb_xfmt:
 7:
  cmp XB_XMP_MAX + 48,d2
  bcs 8f
- .include "xmp_tab.inc"
+ .include "xmp_tab.inc"           /* the namespace is written; xb_xtab = the field table, xb_xpfx = " cad:", XB_XMP_MAX */
+ mov xb_xtab,a0
+ mov a0,(4,sp)                    /* (4) this entry, (12) its record offset, (20) the next entry; d2 = kind */
+20:                               /* entry: kind, offset, NAME=" (NUL-ended); kinds 1 Version 2 Look 3 Film 4 number 5 list of 12 6 half steps 7 WB mode 8 Kelvin; 0 ends */
+ mov (4,sp),a0
+ movbu (a0),d2
+ cmp 0,d2
+ beq 29f
+ movbu (1,a0),d0
+ mov d0,(12,sp)
+ add 2,a0
+21:
+ movbu (a0),d0
+ inc a0
+ cmp 0,d0
+ bne 21b
+ mov a0,(20,sp)
+ cmp 2,d2                         /* Look: only with a name */
+ bne 22f
+ mov (8,sp),a0
+ cmp 0,a0
+ beq 28f
+ movbu (a0),d0
+ cmp 0,d0
+ beq 28f
+22:
+ cmp 8,d2                         /* Kelvin: only with Custom WB (mode 12 at +61 / +62) */
+ bne 23f
+ mov 61,d0
+ call xb_pair,[],0
+ cmp 12,d0
+ bne 28f
+23:
+ mov xb_xpfx,a0
+ call xb_put_str,[],0
+ mov (4,sp),a0
+ add 2,a0
+ call xb_put_str,[],0             /* NAME=" */
+ mov (12,sp),d0
+ cmp 1,d2
+ bne 31f
+ mov 49,d0                        /* Version: "1" */
+ movbu d0,(a3)
+ inc a3
+ bra 27f
+31:
+ cmp 2,d2
+ bne 32f
+ mov (8,sp),a0                    /* Look: the name */
+ call xb_put_name,[],0
+ bra 27f
+32:
+ cmp 3,d2
+ bne 33f
+ mov d3,d0                        /* Film */
+ call xb_put_s,[],0
+ bra 27f
+33:
+ cmp 5,d2
+ beq 36f
+ cmp 7,d2
+ beq 37f
+ cmp 8,d2
+ beq 38f
+ movbu (d0,a2),d0                 /* 4 number, 6 half steps */
+ extb d0
+ cmp 6,d2
+ bne 35f
+ add d0,d0                        /* the record's code (v >= 0: 2v half steps, v < 0: -2v - 1) -> half steps */
+ cmp 0,d0
+ bge 35f
+ not d0
+35:
+ call xb_put_s,[],0
+ bra 27f
+37:
+ call xb_pair,[],0                /* the film WB mode: the index in the camera's 13 modes */
+ call xb_put_s,[],0
+ bra 27f
+38:
+ call xb_pair,[],0                /* the Custom WB Kelvin: 8000 + 100 v, as K / 100 kept inside 20..140 */
+ add 80,d0
+ cmp 20,d0
+ bge 381f
+ mov 20,d0
+381:
+ cmp 140,d0
+ ble 382f
+ mov 140,d0
+382:
+ call xb_put_h,[],0
+ bra 27f
+36:
+ add a2,d0                        /* a list of 12 numbers */
+ mov d0,(12,sp)
+ clr d2
+361:
+ mov (12,sp),a0
+ add d2,a0
+ movbu (a0),d0
+ extb d0
+ call xb_put_s,[],0
+ inc d2
+ cmp 12,d2
+ beq 27f
+ mov 44,d0
+ movbu d0,(a3)
+ inc a3
+ bra 361b
+27:
+ call xb_put_q,[],0
+28:
+ mov (20,sp),a0
+ mov a0,(4,sp)
+ bra 20b
+29:
  mov 1,d0
  mov d0,(20,sp)
 8:

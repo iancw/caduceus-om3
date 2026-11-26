@@ -852,7 +852,7 @@ cv_v0:
  .set CVI_N, 14                   /* + colour mix: "Sat" R / G / B, "Hue" R / G / B, the "Mix" cell */
  .set CVI_CELL, CVI0 + 6
  .set CVI_MXC, CVI0 + 13
- .set CV_WRK, 0xa0fa3000          /* the drawing's work area (uncached), after the built-in files; build.py loads it */
+ .set CV_WRK, 0xa0fa4000          /* the drawing's work area (uncached), after the built-in files; build.py loads it */
  .set CW_LO, 0                    /* u16 lo[3][300], hi[3][300]: each curve's rows at each column */
  .set CW_HI, 1800
  .set CW_ROW, 3600                /* one row of palette indices */
