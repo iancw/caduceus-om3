@@ -10023,3 +10023,8 @@ Branch `feature/look-in-photo-xmp-v2` rebased onto main c14642d. What had to cha
   as on unmodified main in this workspace (four `color-wheel-*`, `halation-radius-pictures-as-drawn`), and `static:hook-list` for the two new hooks
   `hook_xmp` 0x60455cfa and `hook_xmp2` 0x60455d39 (both in the JPEG XMP writer, run only when a photo is written, gated by SEC_READY and by the code block):
   recorded in `tools/test/hooks.json` with the owner's go-ahead (2026-11-25). No `emu_test.py` test for this feature yet.
+- **Feature tests (2026-11-25, emulator only):** `look-in-photo-formatter-matches-the-contract` (`xb_xfmt` on every `docs/xmp-golden.json` record, plus no record /
+  unbuilt packet / unknown text after the Rating) and `look-in-photo-hook-writes-the-look` (the hook at 0x60455cfa as the camera's own code on a stock-shaped packet,
+  the half-press film WB, the SEC_READY gate, the hook after the copy) in `tools/test/emu_test.py`, both through the native-call driver. Both pass on `xmp10`; on a build with
+  the film WB overlay read one byte off and the table's half-step kind changed, the first fails on every golden case and the second on the Custom WB case. The suite on `xmp10`:
+  127 pass, the 5 FAILs of unmodified main in this workspace, `static:hook-list` passes.

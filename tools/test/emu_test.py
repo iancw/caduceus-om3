@@ -2724,8 +2724,185 @@ def run_settle(emu, build, out, card0):
 
 
 # Tests that call our code directly through run_ncall: name -> runner(emu, build, out, card0).
+# The look in the photo (research/NOTES.md "The look in the photo"): the JPEG XMP writer's packet (2301 B at XMP_PACKET) gets the
+# settings as `cad:` fields after the Rating, from the code block's formatter. om-emu runs neither the packet builder nor the
+# writer's copy (a ROM helper is missing), so both tests put a stock-shaped packet in the buffer and run our code natively.
+XMPFMT = 'look-in-photo-formatter-matches-the-contract'
+XMPHOOK = 'look-in-photo-hook-writes-the-look'
+XMP_PACKET, XMP_LEN = 0x62a982e6, 2301
+XMP_ENTRY, XMP_BACK, XMP_RET, XMP_RET_BACK = 0x60455cfa, 0x60455cff, 0x60455d39, 0x60455d3e     # the writer's hook sites
+XMP_END = b'<?xpacket end="w"?>'
+XMP_TAIL = b'/>\n </rdf:RDF>\n</x:xmpmeta>\n'
+SEC_READY_ADDR = 0xa32de58c
+
+
+def xmp_stock(fields=b'', rating=b'0'):
+    """A packet as the camera builds it: Rating, (our fields,) the tail, blanks, the end marker; 2301 bytes."""
+    head = (b'<?xpacket begin="\xef\xbb\xbf" id="W5M0MpCehiHzreSzNTczkc9d"?>\n<x:xmpmeta xmlns:x="adobe:ns:meta/">\n'
+            b' <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n  <rdf:Description rdf:about=""\n'
+            b'   xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmp:Rating="' + rating + b'"')
+    body = head + fields + XMP_TAIL
+    return body + b' ' * (XMP_LEN - len(body) - len(XMP_END)) + XMP_END
+
+
+def xmp_fields(pkt):
+    """(text between the Rating's closing quote and '/>', {name: value} of the cad: attributes)."""
+    i = pkt.index(b'xmp:Rating="') + 14
+    j = pkt.index(b'/>', i)
+    text = pkt[i:j].decode('latin1')
+    return text, dict(re.findall(r' cad:(\w+)="([^"]*)"', text))
+
+
+def xmp_intact(pkt):
+    """What every result must hold: 2301 bytes, no NUL, the end marker last, the tail and the Rating's digit still there."""
+    return len(pkt) == XMP_LEN and b'\0' not in pkt and pkt.endswith(XMP_END) and XMP_TAIL in pkt and b'xmp:Rating="' in pkt
+
+
+def run_xmpfmt(emu, build, out, card0):
+    """The code block's field writer (xb_xfmt) on the contract's golden records (docs/xmp-golden.json): the text after the Rating is
+    byte for byte the golden text, the rest of the packet is as it was; no record, an unbuilt packet or an unknown text after the
+    Rating leave the packet alone and return 0."""
+    d = out / XMPFMT
+    d.mkdir(parents=True, exist_ok=True)
+    sym, xb = elf_symbols(build / 'p.elf'), elf_symbols(build / 'xb10000000.elf')
+    fn = f"W(P+{sym['XPTR']})+{xb['xb_xfmt'] - 0x10000000:#x}"
+    PKT, REC, NAME = 'B+0x1000', 'B+0x3000', 'B+0x3100'
+    golden = json.loads((REPO / 'docs/xmp-golden.json').read_text())['cases']
+    def case(name, pkt, rec, film, nm):
+        mem = [['B', 'dd'], ['B+1', f'=({fn})-B'], ['B+5', 'f02c'], ['B+7', 'cbcb'], [PKT, pkt.hex()]]
+        if rec is not None:
+            mem.append([REC, rec.hex()])
+        if nm is not None:
+            mem.append([NAME, nm.hex()])
+        return {'name': name, 'pc': 'B', 'stop': ['B+7'], 'max': 200000, 'mem': mem,
+                'regs': {'a0': PKT, 'a1': REC if rec is not None else '0', 'd0': str(film), 'd1': NAME if nm is not None else '0'},
+                'read': [[PKT, XMP_LEN]]}
+    stock = xmp_stock()
+    cases, want = [], {}
+    for i, c in enumerate(golden):
+        n = f"golden{i}-{c['name'] or 'own-settings'}"
+        cases.append(case(n, stock, bytes.fromhex(c['record']), c['film'], c['name'].encode('latin1')[:15] + b'\0' if c['name'] else None))
+        want[n] = (1, c['text'])
+    cases.append(case('no-record', stock, None, 0, None)); want['no-record'] = (0, None)
+    cases.append(case('unbuilt-packet', bytes(XMP_LEN), bytes.fromhex(golden[0]['record']), 1, None)); want['unbuilt-packet'] = (0, None)
+    odd = bytearray(stock); odd[stock.index(b'xmp:Rating="') + 14] = 0x58
+    cases.append(case('unknown-text-after-the-rating', bytes(odd), bytes.fromhex(golden[0]['record']), 1, None)); want['unknown-text-after-the-rating'] = (0, None)
+    res = run_ncall(emu, build, d, card0, 's1 wait wait ncall', cases)
+    if isinstance(res, str):
+        return XMPFMT, [res]
+    errors = []
+    for o in cases:
+        r, (d0, text) = res[o['name']], want[o['name']]
+        if r['steps'] >= 200000:
+            errors.append(f"{o['name']}: xb_xfmt did not return (out.json)")
+            continue
+        got = bytes.fromhex(r['mem'][0])
+        if int(r['regs']['d0'], 16) != d0:
+            errors.append(f"{o['name']}: returned {int(r['regs']['d0'], 16)}, not {d0}")
+        if text is None:
+            if got != bytes.fromhex(o['mem'][4][1]):
+                errors.append(f"{o['name']}: the packet changed")
+            continue
+        if not xmp_intact(got):
+            errors.append(f"{o['name']}: the packet is not whole (length, end marker, tail or Rating lost)")
+            continue
+        have = xmp_fields(got)[0]
+        if have != text:
+            k = next((i for i, (x, y) in enumerate(zip(have, text)) if x != y), min(len(have), len(text)))
+            errors.append(f"{o['name']}: text after the Rating differs from the golden text at {k}: {have[max(0, k - 25):k + 25]!r}, not {text[max(0, k - 25):k + 25]!r}")
+        i = got.index(b'xmp:Rating="') + 14
+        if got[:i] != stock[:i]:
+            errors.append(f"{o['name']}: bytes before the fields changed")
+    return XMPFMT, errors
+
+
+def run_xmphook(emu, build, out, card0):
+    """The hook at the JPEG XMP writer's entry (0x60455cfa), run as the camera's own code on a stock-shaped packet: a film on COLOR 1
+    gives Film, its name and the record's fields; own settings give Film 0 and no name; an awkward name is made safe; the film WB
+    comes from the half-press record (ex_rec) when it holds this COLOR; every register and sp come back, the writer's own first
+    byte is written; with section 6 not ready (the gate) the packet is untouched. The hook after the copy (0x60455d39) puts the stock
+    text back and returns d2 + 2301 in a0."""
+    d = out / XMPHOOK
+    d.mkdir(parents=True, exist_ok=True)
+    sym = elf_symbols(build / 'p.elf')
+    A1 = 'B+0x800'
+    keep = {'a0': '0x11111111', 'd1': '0x22222222', 'd2': '0x33333333', 'd3': '0x44444444', 'a2': '0x55555555', 'a3': '0x66666666'}
+    name_at = lambda r: f'W(P+{sym["LPTR"] if "LPTR" in sym else 708})+1312+{16 * r}'
+    word = lambda v: (v & 0xffffffff).to_bytes(4, 'little').hex()
+    stock = xmp_stock()
+    def case(name, lidx, nm, rk=-1, wb=None, gate=True):
+        mem = [[f'{XMP_PACKET:#x}', stock.hex()], [f'P+{sym["LIDX"]}', f'{lidx:02x}'], [f"{sym['ex_rk']:#x}", word(rk)], [A1, '00']]
+        if nm is not None:
+            mem.append([name_at(2), nm.hex() + '00' * (16 - len(nm))])
+        if wb is not None:
+            mem.append([f"{sym['ex_rec'] + 59:#x}", bytes(wb).hex()])
+        if not gate:
+            mem.append([f'{SEC_READY_ADDR:#x}', '1f000000'])
+        return {'name': name, 'pc': f'{XMP_ENTRY:#x}', 'stop': [f'{XMP_BACK:#x}'], 'max': 400000, 'mem': mem,
+                'regs': {'a1': A1, **keep}, 'read': [[f'{XMP_PACKET:#x}', XMP_LEN], [A1, 1]]}
+    cases = [case('film', 3, b'Portra 400'), case('own-settings', 0, None), case('awkward-name', 3, b"A&B<\"x'\xe9"),
+             case('film-wb-from-the-half-press-record', 0, None, rk=0, wb=[0xfc, 0xfe, 0x01, 0x01]),
+             case('film-wb-from-the-slot-when-no-record', 0, None, rk=-1, wb=[0xfc, 0xfe, 0x01, 0x01])]
+    with_fields = xmp_stock(b' xmlns:cad="x" cad:Version="1" cad:Film="3"')
+    cases.append({'name': 'after-the-copy', 'pc': f'{XMP_RET:#x}', 'stop': [f'{XMP_RET_BACK:#x}'], 'max': 400000,
+                  'mem': [[f'{XMP_PACKET:#x}', with_fields.hex()]], 'regs': {'d2': 'B+0x2000', 'a0': '0x11111111'},
+                  'read': [[f'{XMP_PACKET:#x}', XMP_LEN]]})
+    cases.append(case('gate-closed', 3, b'Portra 400', gate=False))      # last: the gate stays closed in this boot
+    res = run_ncall(emu, build, d, card0, 's1 wait wait ncall', cases)
+    if isinstance(res, str):
+        return XMPHOOK, [res]
+    sp = json.loads((d / 'out.json').read_text())['SP']
+    errors = []
+    for o in cases:
+        n, r = o['name'], res[o['name']]
+        if r['steps'] >= o['max']:
+            errors.append(f'{n}: the hook did not come back (out.json)')
+            continue
+        pkt = bytes.fromhex(r['mem'][0])
+        if r['regs']['sp'] != sp:
+            errors.append(f"{n}: sp {r['regs']['sp']}, not {sp}")
+        if n == 'after-the-copy':
+            b = int(json.loads((d / 'out.json').read_text())['B'], 16)
+            if int(r['regs']['a0'], 16) != b + 0x2000 + XMP_LEN:
+                errors.append(f"{n}: a0 {r['regs']['a0']}, not d2 + 2301")
+            if int(r['regs']['d2'], 16) != b + 0x2000:
+                errors.append(f"{n}: d2 changed")
+            if b'cad:' in pkt or not xmp_intact(pkt) or pkt.replace(b' ', b'') != stock.replace(b' ', b''):
+                errors.append(f'{n}: the stock packet is not back')
+            continue
+        b = int(json.loads((d / 'out.json').read_text())['B'], 16)
+        for k, v in keep.items():
+            if int(r['regs'][k], 16) != int(v, 16):
+                errors.append(f"{n}: {k} {r['regs'][k]}, not {v[2:]}")
+        if int(r['regs']['a1'], 16) != b + 0x800 or r['mem'][1] != 'ff':
+            errors.append(f"{n}: a1 {r['regs']['a1']} or the writer's first byte {r['mem'][1]} (ff) is wrong")
+        if n == 'gate-closed':
+            if pkt != stock:
+                errors.append(f'{n}: the packet changed with section 6 not ready')
+            continue
+        if not xmp_intact(pkt):
+            errors.append(f'{n}: the packet is not whole')
+            continue
+        text, f = xmp_fields(pkt)
+        want = {'film': {'Version': '1', 'Film': '3', 'Look': 'Portra 400'}, 'own-settings': {'Film': '0'},
+                'awkward-name': {'Film': '3', 'Look': 'A_B__x__'},
+                'film-wb-from-the-half-press-record': {'Film': '0', 'FilmWbMode': '12', 'FilmWbKelvin': '5400'},
+                'film-wb-from-the-slot-when-no-record': {'Film': '0', 'FilmWbMode': '0'}}[n]
+        for k, v in want.items():
+            if f.get(k) != v:
+                errors.append(f'{n}: cad:{k} is {f.get(k)!r}, not {v!r}')
+        if 'xmlns:cad="https://androidfanman.github.io/caduceus-om3/ns/1/"' not in text:
+            errors.append(f'{n}: the namespace is missing')
+        if n != 'film' and n != 'awkward-name' and 'Look' in f:
+            errors.append(f'{n}: a name with no film')
+        if n == 'film-wb-from-the-slot-when-no-record' and 'FilmWbKelvin' in f:
+            errors.append(f'{n}: a Kelvin without Custom WB')
+    return XMPHOOK, errors
+
+
+
 DIRECT = {WB: run_wb, HL: run_hl, CROPEL: run_cropel, LIVE: run_livelook, CROPSAVE: run_cropsave, HLYIELD: run_hlyield,
-          PBFILM: run_pbfilm, HLRZPICS: run_hlrzpics, FDDRIVE: run_fddrive}
+          PBFILM: run_pbfilm, HLRZPICS: run_hlrzpics, FDDRIVE: run_fddrive, XMPFMT: run_xmpfmt, XMPHOOK: run_xmphook}
 
 
 def newest_looks():
