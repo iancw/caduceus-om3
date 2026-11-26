@@ -2891,7 +2891,7 @@ def run_xmphook(emu, build, out, card0):
         for k, v in want.items():
             if f.get(k) != v:
                 errors.append(f'{n}: cad:{k} is {f.get(k)!r}, not {v!r}')
-        if 'xmlns:cad="https://om-recipes.com/caduceus/ns/1/"' not in text:
+        if 'xmlns:cad="https://caduceus.om-recipes.com/ns/1/"' not in text:
             errors.append(f'{n}: the namespace is missing')
         if n != 'film' and n != 'awkward-name' and 'Look' in f:
             errors.append(f'{n}: a name with no film')

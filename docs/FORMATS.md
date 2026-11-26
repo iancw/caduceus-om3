@@ -152,7 +152,7 @@ The firmware table, the Control Panel (`webapp/src/xmp.ts`) and the exiftool con
 
 Placement: the camera's packet is 2301 bytes (`xmp:Rating` only, then blank padding). The text goes **after the
 `xmp:Rating` digit's closing quote and before `/>`**; the packet length and the closing `<?xpacket end="w"?>` do not
-change. Text = ` xmlns:cad="https://om-recipes.com/caduceus/ns/1/"` then ` cad:Name="value"` for each field in
+change. Text = ` xmlns:cad="https://caduceus.om-recipes.com/ns/1/"` then ` cad:Name="value"` for each field in
 order (one space before each).
 
 | Field | Record | Value |

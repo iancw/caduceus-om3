@@ -1,7 +1,7 @@
 {
  "version": 1,
  "prefix": "cad",
- "namespace": "https://om-recipes.com/caduceus/ns/1/",
+ "namespace": "https://caduceus.om-recipes.com/ns/1/",
  "fields": [
   {
    "name": "Version",

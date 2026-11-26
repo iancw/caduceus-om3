@@ -56,7 +56,7 @@ Colour order for the three lists (the record's order, clockwise from Yellow): Ye
 Violet, Blue, Blue-cyan, Cyan, Green-cyan, Green, Yellow-green. The UI sector order of the Control Panel differs; the
 reader maps it. Record `+42` (legacy Sharpness) is not written.
 
-Namespace: `xmlns:cad="https://om-recipes.com/caduceus/ns/1/"` (**my call**; a short page there describes
+Namespace: `xmlns:cad="https://caduceus.om-recipes.com/ns/1/"` (**my call**; a short page there describes
 the fields). Example tail of the description:
 
 ```

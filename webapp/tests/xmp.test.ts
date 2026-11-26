@@ -118,7 +118,7 @@ describe('lookFromPhoto', () => {
   });
   it('says so for a packet with no Caduceus fields', () => {
     expect(msg(() => lookFromPhoto(jpeg(packet(''))))).toMatch(/Caduceus/);
-    expect(msg(() => lookFromPhoto(jpeg(packet(' xmlns:cad="https://om-recipes.com/caduceus/ns/1/"'))))).toMatch(/Caduceus/);
+    expect(msg(() => lookFromPhoto(jpeg(packet(' xmlns:cad="https://caduceus.om-recipes.com/ns/1/"'))))).toMatch(/Caduceus/);
   });
   it('says so for a file cut off inside the packet', () => {
     const j = jpeg(packet(golden.cases[0].text));
