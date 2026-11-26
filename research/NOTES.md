@@ -10028,3 +10028,9 @@ Branch `feature/look-in-photo-xmp-v2` rebased onto main c14642d. What had to cha
   the half-press film WB, the SEC_READY gate, the hook after the copy) in `tools/test/emu_test.py`, both through the native-call driver. Both pass on `xmp10`; on a build with
   the film WB overlay read one byte off and the table's half-step kind changed, the first fails on every golden case and the second on the Custom WB case. The suite on `xmp10`:
   127 pass, the 5 FAILs of unmodified main in this workspace, `static:hook-list` passes.
+- **Camera result (owner, 2026-11-26, build `xmp11`, E1479999.BIN 9af835ba…06f5; camera-tested, 6 shots RAW+JPEG):** the camera ran and saved all six photos.
+  JPEGs on COLOR 1 with film 2 (twice) and COLOR 2 with film 8 carry all `cad:` fields with the right film numbers and names; COLOR 1 on its own settings carries Film 0 and no
+  Look; Natural and Monochrome Profile JPEGs carry none; the six ORFs carry none (the restore hook works on the camera). `exiftool -config docs/caduceus-xmp.config -XMP-cad:all`
+  reads them; exiftool's validation gives the same minor warnings as a photo with no fields; LookLab's reader (`lookFromPhoto`) loads three of them (film 2, film 8, own settings) with
+  the split toning half steps, Tone Balance and tone values as in the fields. **Not yet seen:** a film with Halation or a Custom WB (FilmWbMode was 0 everywhere), a RAW-only shot,
+  Lightroom / Apple Photos / Google Photos keeping the fields, the curves page and Halation Radius after the 4 KiB layout shift, and start-ups.
