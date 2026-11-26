@@ -10034,3 +10034,8 @@ Branch `feature/look-in-photo-xmp-v2` rebased onto main c14642d. What had to cha
   reads them; exiftool's validation gives the same minor warnings as a photo with no fields; LookLab's reader (`lookFromPhoto`) loads three of them (film 2, film 8, own settings) with
   the split toning half steps, Tone Balance and tone values as in the fields. **Not yet seen:** a film with Halation or a Custom WB (FilmWbMode was 0 everywhere), a RAW-only shot,
   Lightroom / Apple Photos / Google Photos keeping the fields, the curves page and Halation Radius after the 4 KiB layout shift, and start-ups.
+- **Camera round 2 (owner, 2026-11-26, build `xmp11`; PB269412..416):** COLOR 3 with FILM 12 CineStill 800T (Halation 5, Tone Balance 1, Glow, Grain 1, split toning half steps 0 / 2): `Halation="5"`,
+  `ToneBalance="1"`, `ShadowStrength="0"`, `HighlightStrength="2"` in the JPEG, and LookLab loads it (halation 5, balance 1, split toning, bloom, grain). With Custom WB 7000 K set
+  (PB269416): `FilmWbMode="12"` and `FilmWbKelvin="7000"`, and LookLab gives `film_wb` custom 7000. RAW files: no `cad:` fields (all four, plus the RAW-only PB269415, a Natural-mode
+  shot after COLOR shots). Still not seen: an editor (Lightroom / Apple Photos / Google Photos) keeping the fields, a RAW-only shot made in a COLOR, the 7000 K compared with the camera's own
+  Kelvin in the maker note, and the owner's report on boot / curves page / Halation Radius after the layout shift.
