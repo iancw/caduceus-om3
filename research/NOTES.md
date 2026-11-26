@@ -10022,4 +10022,4 @@ Branch `feature/look-in-photo-xmp-v2` rebased onto main c14642d. What had to cha
 - **Emulator (om-emu cafd92d, the pin):** `xmp_check.mjs` formatter 11 / 11 golden cases, hook scenarios 9 / 9. `tools/test/emu_test.py`: 124 pass; the same 5 FAILs
   as on unmodified main in this workspace (four `color-wheel-*`, `halation-radius-pictures-as-drawn`), and `static:hook-list` for the two new hooks
   `hook_xmp` 0x60455cfa and `hook_xmp2` 0x60455d39 (both in the JPEG XMP writer, run only when a photo is written, gated by SEC_READY and by the code block):
-  `tools/test/hooks.json` is NOT updated yet, it waits for the owner's go-ahead. No `emu_test.py` test for this feature yet.
+  recorded in `tools/test/hooks.json` with the owner's go-ahead (2026-11-25). No `emu_test.py` test for this feature yet.

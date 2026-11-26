@@ -267,6 +267,14 @@
   "hook_wt": {
    "addr": "0x605048c1",
    "len": 6
+  },
+  "hook_xmp": {
+   "addr": "0x60455cfa",
+   "len": 5
+  },
+  "hook_xmp2": {
+   "addr": "0x60455d39",
+   "len": 5
   }
  },
  "patch_sites": [
